@@ -167,7 +167,6 @@
       </div>
 
       <form onsubmit="event.preventDefault(); verifyLogin();" class="space-y-4">
-        <!-- UPDATED 4-DIGIT NUMERIC AUTO-LOGIN INPUT -->
         <input 
           type="password" 
           inputmode="numeric" 
@@ -222,7 +221,7 @@
           <i data-lucide="database" class="w-3.5 h-3.5 text-emerald-400"></i>
           <span>മാസ്റ്റർ</span>
         </button>
-        <a href="dashboard.html" target="_blank" title="റിപ്പോർട്ട് പോർട്ടൽ" class="hidden lg:flex items-center gap-1.5 px-2.5 py-1.5 bg-indigo-700 hover:bg-indigo-600 text-white rounded-xl text-xs font-bold shadow touch-btn">
+        <a href="dashboard.html" target="_blank" title="റിപ്പോർട്ട് ഡാഷ്ബോർഡ്" class="hidden lg:flex items-center gap-1.5 px-2.5 py-1.5 bg-indigo-700 hover:bg-indigo-600 text-white rounded-xl text-xs font-bold shadow touch-btn">
           <i data-lucide="bar-chart-2" class="w-3.5 h-3.5"></i>
           <span>DASHBOARD</span>
         </a>
@@ -586,6 +585,7 @@
         <span class="text-[9px] font-bold text-slate-500">തീയതി മാറ്റി റിപ്പോർട്ട് പരിശോധിക്കാം</span>
       </div>
 
+      <!-- STATEMENT CONTROL BAR (WITH CLEAR '✕' BUTTON & AUTO-SELECT INPUT) -->
       <div id="statementControlBar" class="hidden bg-slate-50 p-2 rounded-2xl border border-indigo-200 grid grid-cols-1 sm:grid-cols-4 gap-1.5 text-xs no-print">
         <div>
           <label class="block font-bold text-slate-600 mb-0.5 text-[9px]">വിഭാഗം (Type):</label>
@@ -599,7 +599,25 @@
         </div>
         <div>
           <label class="block font-bold text-slate-600 mb-0.5 text-[9px]">ആളെ തിരഞ്ഞെടുക്കുക:</label>
-          <input list="statPartyDatalist" id="statPartyInput" oninput="generateStatement()" onchange="generateStatement()" placeholder="പേര്..." class="w-full p-1.5 rounded-xl border bg-white font-bold text-[11px] uppercase-input" />
+          <div class="relative">
+            <input 
+              list="statPartyDatalist" 
+              id="statPartyInput" 
+              onclick="this.select()"
+              onfocus="this.select()"
+              oninput="this.value = this.value.toUpperCase(); generateStatement();" 
+              onchange="generateStatement()" 
+              placeholder="പേര്..." 
+              class="w-full p-1.5 pr-6 rounded-xl border bg-white font-bold text-[11px] uppercase-input outline-none focus:ring-1 focus:ring-indigo-500" 
+            />
+            <button 
+              type="button" 
+              onclick="document.getElementById('statPartyInput').value=''; document.getElementById('statPartyInput').focus(); generateStatement();" 
+              title="ക്ലിയർ ചെയ്യുക" 
+              class="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 font-black text-xs p-0.5 cursor-pointer">
+              ✕
+            </button>
+          </div>
           <datalist id="statPartyDatalist"></datalist>
         </div>
         <div>
@@ -607,7 +625,7 @@
           <input type="month" id="statMonth" onchange="generateStatement()" class="w-full p-1 rounded-xl border bg-white font-bold text-[11px]" />
         </div>
         <div class="flex items-end">
-          <button onclick="generateStatement()" class="w-full py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-[11px]">🔍 സ്റ്റേറ്റ്മെന്റ്</button>
+          <button onclick="generateStatement()" class="w-full py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-[11px] cursor-pointer">🔍 സ്റ്റേറ്റ്മെന്റ്</button>
         </div>
       </div>
 
@@ -1206,7 +1224,6 @@
     <div class="bg-white rounded-2xl max-w-xs w-full p-5 shadow-2xl border text-center space-y-3">
       <h3 class="text-base font-bold text-slate-800">സെക്യൂരിറ്റി പിൻ</h3>
       <p id="pinSubText" class="text-xs text-slate-500">തുടരാൻ ലോഗിൻ പിൻ നൽകുക</p>
-      <!-- UPDATED 4-DIGIT NUMERIC AUTO-EXECUTE INPUT -->
       <input 
         type="password" 
         inputmode="numeric" 
