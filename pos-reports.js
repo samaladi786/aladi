@@ -424,67 +424,73 @@ function renderReportData(mode) {
 // ========================================================
 // 3. STATEMENTS ENGINE (SELECT DROPDOWN POPULATION)
 // ========================================================
+var rawStatementPartyList = [];
+
 function populateStatementPartyDatalist() {
   const type = document.getElementById("statPartyType").value;
-  const sel = document.getElementById("statPartySelect") || document.getElementById("statPartyInput");
-  const dl = document.getElementById("statPartyDatalist");
-
-  if (sel) sel.innerHTML = "";
-  if (dl) dl.innerHTML = "";
-
-  function addOption(val, label) {
-    if (sel && sel.tagName === 'SELECT') {
-      const opt = document.createElement("option");
-      opt.value = val;
-      opt.textContent = label || val;
-      sel.appendChild(opt);
-    } else if (sel && sel.tagName === 'INPUT') {
-      if (!sel.value) sel.value = val;
-    }
-    if (dl) {
-      dl.innerHTML += `<option value="${val}">`;
-    }
-  }
+  const searchInp = document.getElementById("statPartySearch");
+  if (searchInp) searchInp.value = "";
+  rawStatementPartyList = [];
 
   if (type === 'customer') {
-    addOption("ALL CUSTOMERS", "📋 ALL CUSTOMERS (ആകെ ക്രെഡിറ്റ് കസ്റ്റമർമാർ)");
+    rawStatementPartyList.push({ val: "ALL CUSTOMERS", label: "📋 ALL CUSTOMERS (ആകെ ക്രെഡിറ്റ് കസ്റ്റമർമാർ)" });
     const creditCustomers = (customersList || []).filter(c => c && (c.type || '').toLowerCase() === 'credit');
     creditCustomers.forEach(c => {
-      if (c && c.name) addOption(c.name.toUpperCase(), c.name.toUpperCase());
+      if (c && c.name) rawStatementPartyList.push({ val: c.name.toUpperCase(), label: c.name.toUpperCase() });
     });
   } else if (type === 'vendor') {
-    addOption("ALL VENDORS", "📋 ALL VENDORS (ആകെ വെണ്ടർമാർ)");
-    vendorsList.forEach(v => {
-      if (v && v.name) addOption(v.name.toUpperCase(), v.name.toUpperCase());
+    rawStatementPartyList.push({ val: "ALL VENDORS", label: "📋 ALL VENDORS (ആകെ വെണ്ടർമാർ)" });
+    (vendorsList || []).forEach(v => {
+      if (v && v.name) rawStatementPartyList.push({ val: v.name.toUpperCase(), label: v.name.toUpperCase() });
     });
   } else if (type === 'employee') {
-    addOption("ALL EMPLOYEES", "📋 ALL EMPLOYEES (ആകെ സ്റ്റാഫ്)");
-    employeesList.forEach(em => {
+    rawStatementPartyList.push({ val: "ALL EMPLOYEES", label: "📋 ALL EMPLOYEES (ആകെ സ്റ്റാഫ്)" });
+    (employeesList || []).forEach(em => {
       if (em && em.name) {
         let label = em.status === 'stopped' ? `${em.name.toUpperCase()} (Stopped)` : em.name.toUpperCase();
-        addOption(label, `👥 ${label}`);
+        rawStatementPartyList.push({ val: label, label: `👥 ${label}` });
       }
     });
   } else if (type === 'agent') {
-    addOption("ALL AGENTS", "📋 ALL AGENTS (ആകെ റൂട്ട് ഏജന്റുമാർ)");
+    rawStatementPartyList.push({ val: "ALL AGENTS", label: "📋 ALL AGENTS (ആകെ റൂട്ട് ഏജന്റുമാർ)" });
     let allAgentNames = new Set();
-    
     (agentsList || []).forEach(a => { if (a && a.name) allAgentNames.add(a.name.trim().toUpperCase()); });
     (customersList || []).forEach(c => { 
       const ag = getCustomerAgentName(c);
       if (ag) allAgentNames.add(ag.toUpperCase()); 
     });
-
     allAgentNames.forEach(ag => {
-      addOption(ag, `👤 ${ag}`);
+      rawStatementPartyList.push({ val: ag, label: `👤 ${ag}` });
     });
   } else if (type === 'expense') {
-    addOption("ALL UTILITY BILLS", "📋 ALL UTILITY BILLS (ആകെ ബില്ലുകൾ)");
-    expensesMasterList.forEach(ex => {
-      if (ex && ex.name) addOption(ex.name.toUpperCase(), `⚡ ${ex.name.toUpperCase()}`);
+    rawStatementPartyList.push({ val: "ALL UTILITY BILLS", label: "📋 ALL UTILITY BILLS (ആകെ ബില്ലുകൾ)" });
+    (expensesMasterList || []).forEach(ex => {
+      if (ex && ex.name) rawStatementPartyList.push({ val: ex.name.toUpperCase(), label: `⚡ ${ex.name.toUpperCase()}` });
     });
   }
 
+  renderStatementSelectOptions(rawStatementPartyList);
+  generateStatement();
+}
+
+function renderStatementSelectOptions(list) {
+  const sel = document.getElementById("statPartySelect");
+  if (!sel) return;
+  sel.innerHTML = "";
+  list.forEach(item => {
+    const opt = document.createElement("option");
+    opt.value = item.val;
+    opt.textContent = item.label;
+    sel.appendChild(opt);
+  });
+}
+
+function filterStatementParties(query) {
+  const q = (query || "").trim().toUpperCase();
+  const filtered = rawStatementPartyList.filter(item => {
+    return item.val.includes(q) || item.label.toUpperCase().includes(q);
+  });
+  renderStatementSelectOptions(filtered.length > 0 ? filtered : rawStatementPartyList);
   generateStatement();
 }
 
