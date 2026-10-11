@@ -124,7 +124,6 @@ function renderReportData(mode) {
 
   let allTx = Array.isArray(transactionsList) ? [...transactionsList] : [];
   const offlineQueue = getOfflineQueue();
-  // FIXED OFFLINE PARSING
   offlineQueue.forEach(item => { 
     const record = item.payload ? item.payload : item;
     allTx.unshift(record); 
@@ -326,7 +325,7 @@ function renderReportData(mode) {
   else {
     creditSalesArr.forEach(s => {
       rCrSCash += s.cash; rCrSBank += s.bank; rCrSCr += s.cr;
-      creditSalesHtml += `<tr><td class="p-1 text-left font-black text-slate-900 truncate" title="${s.name}">${formatShortName(s.name)}</td><td class="p-1 text-emerald-800">${s.cash}</td><td class="p-1 text-blue-800">${s.bank}</td><td class="p-1 text-right font-black text-amber-900">${s.cr}</td></tr>`;
+      creditSalesHtml += `<tr><td class="p-1 text-left font-black text-slate-900 truncate" title="${s.name}">${formatShortName(s.name)}</td><td class="p-1 text-emerald-800">${s.cash}</td><td class="p-1 text-blue-800">${s.bank}</td><td class="p-1 text-right font-black text-amber-950">${s.cr}</td></tr>`;
     });
   }
   creditSalesHtml += `</tbody><tfoot><tr class="bg-amber-50 text-amber-950 font-black border-t"><td class="p-1 text-left uppercase">ആകെ:</td><td class="p-1">${rCrSCash}</td><td class="p-1">${rCrSBank}</td><td class="p-1 text-right text-amber-950">${rCrSCr}</td></tr></tfoot></table>`;
@@ -410,7 +409,7 @@ function renderReportData(mode) {
 }
 
 // ========================================================
-// 3. STATEMENTS ENGINE (CUSTOMERS, VENDORS, STAFF, UTILITIES)
+// 3. STATEMENTS ENGINE (CUSTOMERS, VENDORS, AGENTS, STAFF, UTILITIES)
 // ========================================================
 function populateStatementPartyDatalist() {
   const type = document.getElementById("statPartyType").value;
@@ -434,29 +433,26 @@ function populateStatementPartyDatalist() {
     });
     if (inp) inp.value = "ALL VENDORS";
   } else if (type === 'employee') {
+    dl.innerHTML += `<option value="ALL EMPLOYEES">`;
     employeesList.forEach(em => {
       if (em && em.name) {
         let label = em.status === 'stopped' ? `${em.name.toUpperCase()} (Stopped)` : em.name.toUpperCase();
         dl.innerHTML += `<option value="${label}">`;
-        if (!firstParty) firstParty = label;
       }
     });
-    if (inp && firstParty) inp.value = firstParty;
+    if (inp) inp.value = "ALL EMPLOYEES";
   } else if (type === 'agent') {
+    dl.innerHTML += `<option value="ALL AGENTS">`;
     let allAgentNames = new Set();
     (agentsList || []).forEach(a => { if (a && a.name) allAgentNames.add(a.name.trim().toUpperCase()); });
     (customersList || []).forEach(c => { 
-      if (c && c.agent_id) {
-        const ag = agentsList.find(a => String(a.id) === String(c.agent_id));
-        if (ag && ag.name) allAgentNames.add(ag.name.trim().toUpperCase());
-      }
+      if (c && c.agent_name) allAgentNames.add(c.agent_name.trim().toUpperCase());
     });
 
     allAgentNames.forEach(ag => {
       dl.innerHTML += `<option value="${ag}">`;
-      if (!firstParty) firstParty = ag;
     });
-    if (inp && firstParty) inp.value = firstParty;
+    if (inp) inp.value = "ALL AGENTS";
   } else if (type === 'expense') {
     dl.innerHTML += `<option value="ALL UTILITY BILLS">`;
     expensesMasterList.forEach(ex => {
@@ -480,7 +476,6 @@ function generateStatement() {
 
   let allTx = Array.isArray(transactionsList) ? [...transactionsList] : [];
   const offlineQueue = getOfflineQueue();
-  // FIXED OFFLINE PARSING
   offlineQueue.forEach(item => { 
     const record = item.payload ? item.payload : item;
     allTx.unshift(record); 
@@ -493,14 +488,21 @@ function generateStatement() {
   let totalSalesOrBills = 0;
   let totalPaidOrCollected = 0;
   let statementRows = [];
+
   let isAllVendorsMode = (type === 'vendor' && (partyVal === 'ALL VENDORS' || partyVal === 'ALL'));
   let isAllCustomersMode = (type === 'customer' && (partyVal === 'ALL CUSTOMERS' || partyVal === 'ALL'));
+  let isAllEmployeesMode = (type === 'employee' && (partyVal === 'ALL EMPLOYEES' || partyVal === 'ALL'));
+  let isAllAgentsMode = (type === 'agent' && (partyVal === 'ALL AGENTS' || partyVal === 'ALL'));
   let isAllUtilityBillsMode = (type === 'expense' && (partyVal === 'ALL UTILITY BILLS' || partyVal === 'ALL'));
 
   let vendorsConsolidatedSummary = [];
   let customersConsolidatedSummary = [];
+  let employeesConsolidatedSummary = [];
+  let agentsConsolidatedSummary = [];
+  let singleAgentCustomersSummary = [];
   let utilitiesConsolidatedSummary = [];
 
+  // 1. CUSTOMERS STATEMENT
   if (type === 'customer' && !isAllCustomersMode) {
     const custClean = cleanPartyName(partyVal);
     const cust = customersList.find(c => c && cleanPartyName(c.name) === custClean);
@@ -517,7 +519,6 @@ function generateStatement() {
     });
 
     runningBal = openingBal;
-
     allTx.forEach(t => {
       let tDate = cleanDate(t.date);
       if (t && cleanPartyName(t.party_name) === custClean && t.type === 'sale') {
@@ -562,15 +563,21 @@ function generateStatement() {
 
       const periodPaid = periodCash + periodBank;
       const custClosingBal = custOpeningBal + periodCredit - periodPaid;
-      if (Math.abs(custOpeningBal) <= 0.01 && periodCredit <= 0.01 && periodPaid <= 0.01 && Math.abs(custClosingBal) <= 0.01) return;
+      
+      // 10 റിയാലിൽ താഴെയുള്ളവ ഒഴിവാക്കുന്നു (<= 10 filter)
+      if (custClosingBal <= 10) return;
 
       totalCustOpening += custOpeningBal; totalCustSales += periodCredit; totalCustPaid += periodPaid; totalCustClosing += custClosingBal;
-      customersConsolidatedSummary.push({ name: cust.name, opening: custOpeningBal, sales: periodCredit, cash: periodCash, bank: periodBank, paid: periodPaid, closing: custClosingBal });
+      customersConsolidatedSummary.push({ name: cust.name, opening: custOpeningBal, sales: periodCredit, paid: periodPaid, closing: custClosingBal });
     });
 
+    // ഉയർന്ന തുക മുകളിൽ വരുന്ന രീതിയിൽ സോർട്ട് ചെയ്യുന്നു (Highest to Lowest)
     customersConsolidatedSummary.sort((a, b) => b.closing - a.closing);
     openingBal = totalCustOpening; totalSalesOrBills = totalCustSales; totalPaidOrCollected = totalCustPaid; runningBal = totalCustClosing;
-  } else if (type === 'vendor' && !isAllVendorsMode) {
+  }
+
+  // 2. VENDORS STATEMENT
+  else if (type === 'vendor' && !isAllVendorsMode) {
     const vendClean = cleanPartyName(partyVal);
     const vend = vendorsList.find(v => v && cleanPartyName(v.name) === vendClean);
     partyName = vend ? vend.name.toUpperCase() : partyVal;
@@ -618,67 +625,233 @@ function generateStatement() {
 
       const periodPaid = periodCash + periodBank;
       const vendClosingBal = vendOpeningBal + periodCredit - periodPaid;
-      if (Math.abs(vendOpeningBal) < 10 && periodCredit < 10 && periodPaid < 10 && Math.abs(vendClosingBal) < 10) return;
+      
+      // 10 റിയാലിൽ താഴെയുള്ളവ ഒഴിവാക്കുന്നു (<= 10 filter)
+      if (vendClosingBal <= 10) return;
 
       totalVendOpening += vendOpeningBal; totalVendPurchases += periodCredit; totalVendPaid += periodPaid; totalVendClosing += vendClosingBal;
-      vendorsConsolidatedSummary.push({ name: vend.name, opening: vendOpeningBal, purchases: periodCredit, cash: periodCash, bank: periodBank, paid: periodPaid, closing: vendClosingBal });
+      vendorsConsolidatedSummary.push({ name: vend.name, opening: vendOpeningBal, purchases: periodCredit, paid: periodPaid, closing: vendClosingBal });
     });
 
+    // ഉയർന്ന തുക മുകളിൽ വരുന്ന രീതിയിൽ സോർട്ട് ചെയ്യുന്നു
     vendorsConsolidatedSummary.sort((a, b) => b.closing - a.closing);
     openingBal = totalVendOpening; totalSalesOrBills = totalVendPurchases; totalPaidOrCollected = totalVendPaid; runningBal = totalVendClosing;
-  } else if (type === 'employee') {
-    const cleanEmpName = cleanPartyName(partyVal);
-    const emp = employeesList.find(e => e && cleanPartyName(e.name) === cleanEmpName);
-    partyName = emp ? emp.name.toUpperCase() : partyVal;
+  }
 
-    if (emp) {
-      const selYear = parseInt(monthVal.split('-')[0]);
-      const selMonth = parseInt(monthVal.split('-')[1]) - 1;
-      const priorMonthEnd = new Date(selYear, selMonth, 0);
-      const priorDateStr = `${priorMonthEnd.getFullYear()}-${String(priorMonthEnd.getMonth() + 1).padStart(2, '0')}-${String(priorMonthEnd.getDate()).padStart(2, '0')}`;
+  // 3. AGENT STATEMENT (NEW ROBUST IMPLEMENTATION)
+  else if (type === 'agent') {
+    if (isAllAgentsMode) {
+      partyName = `TOTAL ROUTE AGENTS STATEMENT`;
+      let totalAgOpening = 0, totalAgSales = 0, totalAgPaid = 0, totalAgClosing = 0;
 
-      openingBal = calculateEmployeePendingBalance(emp, priorDateStr);
-      runningBal = openingBal;
-      const monthlySalary = parseFloat(emp.monthly_salary) || 0;
-      const joinD = parseToDateObj(emp.joining_date);
+      let allUniqueAgents = new Set();
+      (agentsList || []).forEach(a => { if (a && a.name) allUniqueAgents.add(a.name.trim().toUpperCase()); });
+      (customersList || []).forEach(c => { if (c && c.agent_name) allUniqueAgents.add(c.agent_name.trim().toUpperCase()); });
 
-      for (let k = 1; k <= 120; k++) {
-        let cycleDateObj = getCycleStartDate(joinD, k);
-        let cycleDateStr = `${cycleDateObj.getFullYear()}-${String(cycleDateObj.getMonth() + 1).padStart(2, '0')}-${String(cycleDateObj.getDate()).padStart(2, '0')}`;
-        if (cycleDateStr.startsWith(monthVal)) {
-          totalSalesOrBills += monthlySalary;
-          statementRows.push({ date: cycleDateStr, desc: `മാസ ശമ്പളം (Cycle ${k})`, cash: 0, bank: 0, bill: monthlySalary, isAccrual: true });
+      allUniqueAgents.forEach(agName => {
+        let agOpening = 0, agSales = 0, agPaid = 0, agClosing = 0, custCount = 0;
+        const agClean = cleanPartyName(agName);
+
+        (customersList || []).forEach(cust => {
+          if (!cust) return;
+          const cAgClean = cleanPartyName(cust.agent_name);
+          if (cAgClean === agClean) {
+            let cOpening = parseFloat(cust.opening_balance) || 0;
+            let cCredit = 0, cCash = 0, cBank = 0;
+            const cName = cleanPartyName(cust.name);
+
+            allTx.forEach(t => {
+              if (t && cleanPartyName(t.party_name) === cName && t.type === 'sale') {
+                const tDate = cleanDate(t.date);
+                const cr = parseFloat(t.credit_amount) || 0;
+                const ca = Math.abs(parseFloat(t.cash_amount) || 0);
+                const ba = Math.abs(parseFloat(t.bank_amount) || 0);
+                if (tDate < fromDate) cOpening += (cr - ca - ba);
+                else if (tDate.startsWith(monthVal)) { cCredit += cr; cCash += ca; cBank += ba; }
+              }
+            });
+
+            const cPaid = cCash + cBank;
+            const cBal = cOpening + cCredit - cPaid;
+            if (cBal > 10) custCount++;
+
+            agOpening += cOpening;
+            agSales += cCredit;
+            agPaid += cPaid;
+            agClosing += cBal;
+          }
+        });
+
+        // 10 റിയാലിൽ താഴെയുള്ള ബാക്കികൾ ഒഴിവാക്കുന്നു
+        if (agClosing <= 10) return;
+
+        totalAgOpening += agOpening;
+        totalAgSales += agSales;
+        totalAgPaid += agPaid;
+        totalAgClosing += agClosing;
+
+        agentsConsolidatedSummary.push({
+          name: agName,
+          custCount: custCount,
+          opening: agOpening,
+          sales: agSales,
+          paid: agPaid,
+          closing: agClosing
+        });
+      });
+
+      agentsConsolidatedSummary.sort((a, b) => b.closing - a.closing);
+      openingBal = totalAgOpening; totalSalesOrBills = totalAgSales; totalPaidOrCollected = totalAgPaid; runningBal = totalAgClosing;
+    } else {
+      // നിർദ്ദിഷ്ട ഏജന്റിന് കീഴിലുള്ള കസ്റ്റമർമാരുടെ ലിസ്റ്റ്
+      const agClean = cleanPartyName(partyVal);
+      partyName = `AGENT: ${partyVal} - ROUTE CUSTOMERS STATEMENT`;
+      let totalAgOpening = 0, totalAgSales = 0, totalAgPaid = 0, totalAgClosing = 0;
+
+      (customersList || []).forEach(cust => {
+        if (!cust) return;
+        const cAgClean = cleanPartyName(cust.agent_name);
+        if (cAgClean === agClean) {
+          let cOpening = parseFloat(cust.opening_balance) || 0;
+          let cCredit = 0, cCash = 0, cBank = 0;
+          const cName = cleanPartyName(cust.name);
+
+          allTx.forEach(t => {
+            if (t && cleanPartyName(t.party_name) === cName && t.type === 'sale') {
+              const tDate = cleanDate(t.date);
+              const cr = parseFloat(t.credit_amount) || 0;
+              const ca = Math.abs(parseFloat(t.cash_amount) || 0);
+              const ba = Math.abs(parseFloat(t.bank_amount) || 0);
+              if (tDate < fromDate) cOpening += (cr - ca - ba);
+              else if (tDate.startsWith(monthVal)) { cCredit += cr; cCash += ca; cBank += ba; }
+            }
+          });
+
+          const cPaid = cCash + cBank;
+          const cBal = cOpening + cCredit - cPaid;
+
+          // 10 റിയാലിൽ താഴെയുള്ള കസ്റ്റമർമാരെ ഒഴിവാക്കുന്നു
+          if (cBal <= 10) return;
+
+          totalAgOpening += cOpening;
+          totalAgSales += cCredit;
+          totalAgPaid += cPaid;
+          totalAgClosing += cBal;
+
+          singleAgentCustomersSummary.push({
+            name: cust.name,
+            opening: cOpening,
+            sales: cCredit,
+            paid: cPaid,
+            closing: cBal
+          });
         }
-      }
+      });
 
-      allTx.forEach(t => {
-        if (t && t.type === 'salary' && cleanPartyName(t.party_name).includes(cleanEmpName)) {
-          let tDate = cleanDate(t.date);
-          if (tDate >= fromDate && tDate <= toDate) {
-            let rawC = parseFloat(t.cash_amount) || 0;
-            let rawB = parseFloat(t.bank_amount) || 0;
-            if (rawC > 0 || rawB > 0) {
-              let inAmt = rawC + rawB;
-              totalSalesOrBills += inAmt;
-              statementRows.push({ date: tDate, desc: t.party_name.replace(/^Staff:\s*/i, ""), cash: 0, bank: 0, bill: inAmt });
-            } else {
-              const paid = Math.abs(rawC) + Math.abs(rawB);
-              totalPaidOrCollected += paid;
-              statementRows.push({ date: tDate, desc: t.party_name.replace(/^Staff:\s*/i, ""), cash: Math.abs(rawC), bank: Math.abs(rawB), bill: 0 });
+      // ഏറ്റവും കൂടുതൽ കുടിശ്ശികയുള്ള കസ്റ്റമർ മുകളിൽ വരുന്നു
+      singleAgentCustomersSummary.sort((a, b) => b.closing - a.closing);
+      openingBal = totalAgOpening; totalSalesOrBills = totalAgSales; totalPaidOrCollected = totalAgPaid; runningBal = totalAgClosing;
+    }
+  }
+
+  // 4. EMPLOYEES STATEMENT
+  else if (type === 'employee') {
+    if (isAllEmployeesMode) {
+      partyName = `TOTAL EMPLOYEES PENDING SALARY STATEMENT`;
+      let totalEmpSalary = 0, totalEmpPaid = 0, totalEmpClosing = 0;
+
+      (employeesList || []).forEach(emp => {
+        if (!emp) return;
+        const pendingBal = calculateEmployeePendingBalance(emp, toDate);
+
+        // 10 റിയാലിൽ താഴെ ശമ്പളം ബാക്കിയുള്ളവരെ ഒഴിവാക്കുന്നു
+        if (pendingBal <= 10) return;
+
+        let staffPaid = 0;
+        const empClean = cleanPartyName(emp.name);
+        allTx.forEach(t => {
+          if (t && t.type === 'salary' && cleanPartyName(t.party_name).includes(empClean)) {
+            const tDate = cleanDate(t.date);
+            if (tDate.startsWith(monthVal)) {
+              staffPaid += (Math.abs(parseFloat(t.cash_amount) || 0) + Math.abs(parseFloat(t.bank_amount) || 0));
             }
           }
-        }
+        });
+
+        totalEmpSalary += (parseFloat(emp.monthly_salary) || 0);
+        totalEmpPaid += staffPaid;
+        totalEmpClosing += pendingBal;
+
+        employeesConsolidatedSummary.push({
+          name: emp.name,
+          salary: parseFloat(emp.monthly_salary) || 0,
+          paid: staffPaid,
+          closing: pendingBal
+        });
       });
 
-      statementRows.sort((a, b) => a.date.localeCompare(b.date));
-      statementRows.forEach(r => {
-        const debit = r.bill || 0;
-        const credit = (r.cash || 0) + (r.bank || 0);
-        runningBal += debit - credit;
-        r.bal = runningBal;
-      });
+      employeesConsolidatedSummary.sort((a, b) => b.closing - a.closing);
+      openingBal = 0;
+      totalSalesOrBills = totalEmpSalary;
+      totalPaidOrCollected = totalEmpPaid;
+      runningBal = totalEmpClosing;
+    } else {
+      const cleanEmpName = cleanPartyName(partyVal);
+      const emp = employeesList.find(e => e && cleanPartyName(e.name) === cleanEmpName);
+      partyName = emp ? emp.name.toUpperCase() : partyVal;
+
+      if (emp) {
+        const selYear = parseInt(monthVal.split('-')[0]);
+        const selMonth = parseInt(monthVal.split('-')[1]) - 1;
+        const priorMonthEnd = new Date(selYear, selMonth, 0);
+        const priorDateStr = `${priorMonthEnd.getFullYear()}-${String(priorMonthEnd.getMonth() + 1).padStart(2, '0')}-${String(priorMonthEnd.getDate()).padStart(2, '0')}`;
+
+        openingBal = calculateEmployeePendingBalance(emp, priorDateStr);
+        runningBal = openingBal;
+        const monthlySalary = parseFloat(emp.monthly_salary) || 0;
+        const joinD = parseToDateObj(emp.joining_date);
+
+        for (let k = 1; k <= 120; k++) {
+          let cycleDateObj = getCycleStartDate(joinD, k);
+          let cycleDateStr = `${cycleDateObj.getFullYear()}-${String(cycleDateObj.getMonth() + 1).padStart(2, '0')}-${String(cycleDateObj.getDate()).padStart(2, '0')}`;
+          if (cycleDateStr.startsWith(monthVal)) {
+            totalSalesOrBills += monthlySalary;
+            statementRows.push({ date: cycleDateStr, desc: `മാസ ശമ്പളം (Cycle ${k})`, cash: 0, bank: 0, bill: monthlySalary, isAccrual: true });
+          }
+        }
+
+        allTx.forEach(t => {
+          if (t && t.type === 'salary' && cleanPartyName(t.party_name).includes(cleanEmpName)) {
+            let tDate = cleanDate(t.date);
+            if (tDate >= fromDate && tDate <= toDate) {
+              let rawC = parseFloat(t.cash_amount) || 0;
+              let rawB = parseFloat(t.bank_amount) || 0;
+              if (rawC > 0 || rawB > 0) {
+                let inAmt = rawC + rawB;
+                totalSalesOrBills += inAmt;
+                statementRows.push({ date: tDate, desc: t.party_name.replace(/^Staff:\s*/i, ""), cash: 0, bank: 0, bill: inAmt });
+              } else {
+                const paid = Math.abs(rawC) + Math.abs(rawB);
+                totalPaidOrCollected += paid;
+                statementRows.push({ date: tDate, desc: t.party_name.replace(/^Staff:\s*/i, ""), cash: Math.abs(rawC), bank: Math.abs(rawB), bill: 0 });
+              }
+            }
+          }
+        });
+
+        statementRows.sort((a, b) => a.date.localeCompare(b.date));
+        statementRows.forEach(r => {
+          const debit = r.bill || 0;
+          const credit = (r.cash || 0) + (r.bank || 0);
+          runningBal += debit - credit;
+          r.bal = runningBal;
+        });
+      }
     }
-  } else if (type === 'expense') {
+  }
+
+  // 5. UTILITY BILLS STATEMENT
+  else if (type === 'expense') {
     if (isAllUtilityBillsMode) {
       partyName = `TOTAL RECURRING UTILITY BILLS STATEMENT`;
       let totalExpOpening = 0, totalExpBills = 0, totalExpPaid = 0, totalExpClosing = 0;
@@ -706,6 +879,8 @@ function generateStatement() {
         });
 
         const exClosingBal = exOpeningBal + periodBills - periodPaid;
+        if (exClosingBal <= 10) return;
+
         totalExpOpening += exOpeningBal;
         totalExpBills += periodBills;
         totalExpPaid += periodPaid;
@@ -720,6 +895,7 @@ function generateStatement() {
         });
       });
 
+      utilitiesConsolidatedSummary.sort((a, b) => b.closing - a.closing);
       openingBal = totalExpOpening;
       totalSalesOrBills = totalExpBills;
       totalPaidOrCollected = totalExpPaid;
@@ -768,6 +944,7 @@ function generateStatement() {
     }
   }
 
+  // UI ELEMENTS UPDATE
   const statHead = document.getElementById("statHeaderTitle");
   const statPeriod = document.getElementById("statPeriodLabel");
   const statOpen = document.getElementById("statOpeningBalText");
@@ -775,7 +952,7 @@ function generateStatement() {
   const statPaid = document.getElementById("statMonthPaidText");
   const statClose = document.getElementById("statClosingBalText");
 
-  if (statHead) statHead.innerText = `${partyName} - MONTHLY STATEMENT`;
+  if (statHead) statHead.innerText = `${partyName}`;
   if (statPeriod) statPeriod.innerText = `Period: ${monthVal}`;
   if (statOpen) statOpen.innerText = `${openingBal.toLocaleString('en-IN')}`;
   if (statSales) statSales.innerText = `${totalSalesOrBills.toLocaleString('en-IN')}`;
@@ -784,20 +961,39 @@ function generateStatement() {
 
   let tableHtml = "";
 
+  // TABLES RENDERING
   if (isAllCustomersMode) {
-    tableHtml = `<table class="w-full border-collapse bg-white rounded-xl overflow-hidden shadow-sm table-fixed"><thead><tr class="bg-emerald-900 text-white font-black text-center border-b"><th class="p-1 w-6">#</th><th class="p-1 w-2/6 text-left">Customer</th><th class="p-1 w-1/6">Opening</th><th class="p-1 w-1/6">Sales</th><th class="p-1 w-1/6">Paid</th><th class="p-1 w-1/6 bg-emerald-950">Due</th></tr></thead><tbody class="divide-y divide-slate-100 font-bold">`;
+    tableHtml = `<table class="w-full border-collapse bg-white rounded-xl overflow-hidden shadow-sm table-fixed"><thead><tr class="bg-emerald-900 text-white font-black text-center border-b"><th class="p-1 w-6">#</th><th class="p-1 w-2/6 text-left">Customer</th><th class="p-1 w-1/6">Opening</th><th class="p-1 w-1/6">Sales</th><th class="p-1 w-1/6">Paid</th><th class="p-1 w-1/6 bg-emerald-950">Due (>10)</th></tr></thead><tbody class="divide-y divide-slate-100 font-bold">`;
     customersConsolidatedSummary.forEach((r, idx) => {
       tableHtml += `<tr class="text-center hover:bg-slate-50"><td class="p-1">${idx + 1}</td><td class="p-1 text-left truncate">${formatShortName(r.name)}</td><td class="p-1">${r.opening.toLocaleString('en-IN')}</td><td class="p-1 text-amber-700">${r.sales.toLocaleString('en-IN')}</td><td class="p-1 text-emerald-700">${r.paid.toLocaleString('en-IN')}</td><td class="p-1 font-black text-emerald-900">${r.closing.toLocaleString('en-IN')}</td></tr>`;
     });
     tableHtml += `</tbody></table>`;
   } else if (isAllVendorsMode) {
-    tableHtml = `<table class="w-full border-collapse bg-white rounded-xl overflow-hidden shadow-sm table-fixed"><thead><tr class="bg-blue-900 text-white font-black text-center border-b"><th class="p-1 w-6">#</th><th class="p-1 w-2/6 text-left">Vendor</th><th class="p-1 w-1/6">Opening</th><th class="p-1 w-1/6">Purchase</th><th class="p-1 w-1/6">Paid</th><th class="p-1 w-1/6 bg-blue-950">Due</th></tr></thead><tbody class="divide-y divide-slate-100 font-bold">`;
+    tableHtml = `<table class="w-full border-collapse bg-white rounded-xl overflow-hidden shadow-sm table-fixed"><thead><tr class="bg-blue-900 text-white font-black text-center border-b"><th class="p-1 w-6">#</th><th class="p-1 w-2/6 text-left">Vendor</th><th class="p-1 w-1/6">Opening</th><th class="p-1 w-1/6">Purchase</th><th class="p-1 w-1/6">Paid</th><th class="p-1 w-1/6 bg-blue-950">Due (>10)</th></tr></thead><tbody class="divide-y divide-slate-100 font-bold">`;
     vendorsConsolidatedSummary.forEach((r, idx) => {
       tableHtml += `<tr class="text-center hover:bg-slate-50"><td class="p-1">${idx + 1}</td><td class="p-1 text-left truncate">${formatShortName(r.name)}</td><td class="p-1">${r.opening.toLocaleString('en-IN')}</td><td class="p-1 text-blue-700">${r.purchases.toLocaleString('en-IN')}</td><td class="p-1 text-emerald-700">${r.paid.toLocaleString('en-IN')}</td><td class="p-1 font-black text-rose-700">${r.closing.toLocaleString('en-IN')}</td></tr>`;
     });
     tableHtml += `</tbody></table>`;
+  } else if (type === 'agent' && isAllAgentsMode) {
+    tableHtml = `<table class="w-full border-collapse bg-white rounded-xl overflow-hidden shadow-sm table-fixed"><thead><tr class="bg-indigo-900 text-white font-black text-center border-b"><th class="p-1 w-6">#</th><th class="p-1 w-2/6 text-left">Route Agent</th><th class="p-1 w-1/6">Parties</th><th class="p-1 w-1/6">Sales</th><th class="p-1 w-1/6">Collected</th><th class="p-1 w-1/6 bg-indigo-950">Due (>10)</th></tr></thead><tbody class="divide-y divide-slate-100 font-bold">`;
+    agentsConsolidatedSummary.forEach((r, idx) => {
+      tableHtml += `<tr class="text-center hover:bg-slate-50"><td class="p-1">${idx + 1}</td><td class="p-1 text-left truncate">${formatShortName(r.name)}</td><td class="p-1 text-slate-700">${r.custCount}</td><td class="p-1 text-amber-700">${r.sales.toLocaleString('en-IN')}</td><td class="p-1 text-emerald-700">${r.paid.toLocaleString('en-IN')}</td><td class="p-1 font-black text-indigo-950">${r.closing.toLocaleString('en-IN')}</td></tr>`;
+    });
+    tableHtml += `</tbody></table>`;
+  } else if (type === 'agent' && !isAllAgentsMode) {
+    tableHtml = `<table class="w-full border-collapse bg-white rounded-xl overflow-hidden shadow-sm table-fixed"><thead><tr class="bg-indigo-900 text-white font-black text-center border-b"><th class="p-1 w-6">#</th><th class="p-1 w-2/6 text-left">Customer</th><th class="p-1 w-1/6">Opening</th><th class="p-1 w-1/6">Sales</th><th class="p-1 w-1/6">Paid</th><th class="p-1 w-1/6 bg-indigo-950">Due (>10)</th></tr></thead><tbody class="divide-y divide-slate-100 font-bold">`;
+    singleAgentCustomersSummary.forEach((r, idx) => {
+      tableHtml += `<tr class="text-center hover:bg-slate-50"><td class="p-1">${idx + 1}</td><td class="p-1 text-left truncate">${formatShortName(r.name)}</td><td class="p-1">${r.opening.toLocaleString('en-IN')}</td><td class="p-1 text-amber-700">${r.sales.toLocaleString('en-IN')}</td><td class="p-1 text-emerald-700">${r.paid.toLocaleString('en-IN')}</td><td class="p-1 font-black text-indigo-950">${r.closing.toLocaleString('en-IN')}</td></tr>`;
+    });
+    tableHtml += `</tbody></table>`;
+  } else if (type === 'employee' && isAllEmployeesMode) {
+    tableHtml = `<table class="w-full border-collapse bg-white rounded-xl overflow-hidden shadow-sm table-fixed"><thead><tr class="bg-purple-900 text-white font-black text-center border-b"><th class="p-1 w-6">#</th><th class="p-1 w-2/6 text-left">Staff Name</th><th class="p-1 w-1/6">Salary</th><th class="p-1 w-1/6">Paid</th><th class="p-1 w-1/6 bg-purple-950">Pending (>10)</th></tr></thead><tbody class="divide-y divide-slate-100 font-bold">`;
+    employeesConsolidatedSummary.forEach((r, idx) => {
+      tableHtml += `<tr class="text-center hover:bg-slate-50"><td class="p-1">${idx + 1}</td><td class="p-1 text-left truncate">${formatShortName(r.name)}</td><td class="p-1">${r.salary.toLocaleString('en-IN')}</td><td class="p-1 text-emerald-700">${r.paid.toLocaleString('en-IN')}</td><td class="p-1 font-black text-purple-950">${r.closing.toLocaleString('en-IN')}</td></tr>`;
+    });
+    tableHtml += `</tbody></table>`;
   } else if (isAllUtilityBillsMode) {
-    tableHtml = `<table class="w-full border-collapse bg-white rounded-xl overflow-hidden shadow-sm table-fixed"><thead><tr class="bg-amber-900 text-white font-black text-center border-b"><th class="p-1 w-6">#</th><th class="p-1 w-2/6 text-left">Utility/Bill</th><th class="p-1 w-1/6">Opening</th><th class="p-1 w-1/6">New Bills</th><th class="p-1 w-1/6">Paid</th><th class="p-1 w-1/6 bg-amber-950">Due</th></tr></thead><tbody class="divide-y divide-slate-100 font-bold">`;
+    tableHtml = `<table class="w-full border-collapse bg-white rounded-xl overflow-hidden shadow-sm table-fixed"><thead><tr class="bg-amber-900 text-white font-black text-center border-b"><th class="p-1 w-6">#</th><th class="p-1 w-2/6 text-left">Utility/Bill</th><th class="p-1 w-1/6">Opening</th><th class="p-1 w-1/6">New Bills</th><th class="p-1 w-1/6">Paid</th><th class="p-1 w-1/6 bg-amber-950">Due (>10)</th></tr></thead><tbody class="divide-y divide-slate-100 font-bold">`;
     utilitiesConsolidatedSummary.forEach((r, idx) => {
       tableHtml += `<tr class="text-center hover:bg-slate-50"><td class="p-1">${idx + 1}</td><td class="p-1 text-left truncate">${formatShortName(r.name)}</td><td class="p-1">${r.opening.toLocaleString('en-IN')}</td><td class="p-1 text-indigo-700">${r.bills.toLocaleString('en-IN')}</td><td class="p-1 text-emerald-700">${r.paid.toLocaleString('en-IN')}</td><td class="p-1 font-black text-amber-900">${r.closing.toLocaleString('en-IN')}</td></tr>`;
     });
