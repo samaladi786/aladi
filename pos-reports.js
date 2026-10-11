@@ -6,6 +6,19 @@ var currentReportMode = 'daily';
 var currentReportDataForWA = {};
 var currentStatementDataForWA = null;
 
+// കസ്റ്റമറിൽ നിന്ന് ഏജന്റിന്റെ പേര് ഏത് ഫീൽഡിൽ നിന്നായാലും (agent_name, agent, agent_id) കൃത്യമായി കണ്ടെത്തുന്നു
+function getCustomerAgentName(cust) {
+  if (!cust) return '';
+  if (cust.agent_name && String(cust.agent_name).trim()) return String(cust.agent_name).trim();
+  if (cust.agent && String(cust.agent).trim()) return String(cust.agent).trim();
+  if (cust.route_agent && String(cust.route_agent).trim()) return String(cust.route_agent).trim();
+  if (cust.agent_id && Array.isArray(agentsList)) {
+    const matched = agentsList.find(a => String(a.id) === String(cust.agent_id) || cleanPartyName(a.name) === cleanPartyName(cust.agent_id));
+    if (matched && matched.name) return String(matched.name).trim();
+  }
+  return '';
+}
+
 // ========================================================
 // 1. REPORTS MODAL CONTROLLER
 // ========================================================
@@ -325,7 +338,7 @@ function renderReportData(mode) {
   else {
     creditSalesArr.forEach(s => {
       rCrSCash += s.cash; rCrSBank += s.bank; rCrSCr += s.cr;
-      creditSalesHtml += `<tr><td class="p-1 text-left font-black text-slate-900 truncate" title="${s.name}">${formatShortName(s.name)}</td><td class="p-1 text-emerald-800">${s.cash}</td><td class="p-1 text-blue-800">${s.bank}</td><td class="p-1 text-right font-black text-amber-950">${s.cr}</td></tr>`;
+      creditSalesHtml += `<tr><td class="p-1 text-left font-black text-slate-900 truncate" title="${s.name}">${formatShortName(s.name)}</td><td class="p-1 text-emerald-800">${s.cash}</td><td class="p-1 text-blue-800">${s.bank}</td><td class="p-1 text-right font-black text-amber-900">${s.cr}</td></tr>`;
     });
   }
   creditSalesHtml += `</tbody><tfoot><tr class="bg-amber-50 text-amber-950 font-black border-t"><td class="p-1 text-left uppercase">ആകെ:</td><td class="p-1">${rCrSCash}</td><td class="p-1">${rCrSBank}</td><td class="p-1 text-right text-amber-950">${rCrSCr}</td></tr></tfoot></table>`;
@@ -416,9 +429,7 @@ function populateStatementPartyDatalist() {
   const dl = document.getElementById("statPartyDatalist");
   const inp = document.getElementById("statPartyInput");
   dl.innerHTML = "";
-  if (inp) inp.value = "";
 
-  let firstParty = "";
   if (type === 'customer') {
     const creditCustomers = (customersList || []).filter(c => c && (c.type || '').toLowerCase() === 'credit');
     dl.innerHTML += `<option value="ALL CUSTOMERS">`;
@@ -444,9 +455,12 @@ function populateStatementPartyDatalist() {
   } else if (type === 'agent') {
     dl.innerHTML += `<option value="ALL AGENTS">`;
     let allAgentNames = new Set();
+    
+    // ഏജന്റ് മാസ്റ്ററിൽ നിന്നും കസ്റ്റമർ വിവരങ്ങളിൽ നിന്നും ഏജന്റുമാരെ കണ്ടെത്തുന്നു
     (agentsList || []).forEach(a => { if (a && a.name) allAgentNames.add(a.name.trim().toUpperCase()); });
     (customersList || []).forEach(c => { 
-      if (c && c.agent_name) allAgentNames.add(c.agent_name.trim().toUpperCase());
+      const ag = getCustomerAgentName(c);
+      if (ag) allAgentNames.add(ag.toUpperCase()); 
     });
 
     allAgentNames.forEach(ag => {
@@ -466,10 +480,24 @@ function populateStatementPartyDatalist() {
 
 function generateStatement() {
   const type = document.getElementById("statPartyType").value;
-  const partyVal = (document.getElementById("statPartyInput")?.value || "").trim().toUpperCase();
-  const monthVal = (document.getElementById("statMonth")?.value || "").trim();
+  let partyVal = (document.getElementById("statPartyInput")?.value || "").trim().toUpperCase();
+  let monthVal = (document.getElementById("statMonth")?.value || "").trim();
 
-  if (!partyVal || !monthVal) return;
+  // മാസം സെലക്ട് ചെയ്തിട്ടില്ലെങ്കിൽ തനിയെ ഈ മാസം സെറ്റ് ചെയ്യുന്നു
+  if (!monthVal) {
+    monthVal = (document.getElementById("mobileFilterDate")?.value || getSaudiBusinessDate()).substring(0, 7);
+    if (document.getElementById("statMonth")) document.getElementById("statMonth").value = monthVal;
+  }
+
+  // പേര് കൊടുത്തിട്ടില്ലെങ്കിൽ തനിയെ 'ALL' മോഡ് ആക്കുന്നു
+  if (!partyVal) {
+    if (type === 'customer') partyVal = "ALL CUSTOMERS";
+    else if (type === 'vendor') partyVal = "ALL VENDORS";
+    else if (type === 'agent') partyVal = "ALL AGENTS";
+    else if (type === 'employee') partyVal = "ALL EMPLOYEES";
+    else if (type === 'expense') partyVal = "ALL UTILITY BILLS";
+    if (document.getElementById("statPartyInput")) document.getElementById("statPartyInput").value = partyVal;
+  }
 
   const fromDate = `${monthVal}-01`;
   const toDate = `${monthVal}-31`;
@@ -633,12 +661,11 @@ function generateStatement() {
       vendorsConsolidatedSummary.push({ name: vend.name, opening: vendOpeningBal, purchases: periodCredit, paid: periodPaid, closing: vendClosingBal });
     });
 
-    // ഉയർന്ന തുക മുകളിൽ വരുന്ന രീതിയിൽ സോർട്ട് ചെയ്യുന്നു
     vendorsConsolidatedSummary.sort((a, b) => b.closing - a.closing);
     openingBal = totalVendOpening; totalSalesOrBills = totalVendPurchases; totalPaidOrCollected = totalVendPaid; runningBal = totalVendClosing;
   }
 
-  // 3. AGENT STATEMENT (NEW ROBUST IMPLEMENTATION)
+  // 3. AGENT STATEMENT (ROBUST LINKAGE VIA ID & NAME)
   else if (type === 'agent') {
     if (isAllAgentsMode) {
       partyName = `TOTAL ROUTE AGENTS STATEMENT`;
@@ -646,7 +673,10 @@ function generateStatement() {
 
       let allUniqueAgents = new Set();
       (agentsList || []).forEach(a => { if (a && a.name) allUniqueAgents.add(a.name.trim().toUpperCase()); });
-      (customersList || []).forEach(c => { if (c && c.agent_name) allUniqueAgents.add(c.agent_name.trim().toUpperCase()); });
+      (customersList || []).forEach(c => { 
+        const ag = getCustomerAgentName(c);
+        if (ag) allUniqueAgents.add(ag.toUpperCase()); 
+      });
 
       allUniqueAgents.forEach(agName => {
         let agOpening = 0, agSales = 0, agPaid = 0, agClosing = 0, custCount = 0;
@@ -654,8 +684,8 @@ function generateStatement() {
 
         (customersList || []).forEach(cust => {
           if (!cust) return;
-          const cAgClean = cleanPartyName(cust.agent_name);
-          if (cAgClean === agClean) {
+          const cAg = getCustomerAgentName(cust);
+          if (cleanPartyName(cAg) === agClean) {
             let cOpening = parseFloat(cust.opening_balance) || 0;
             let cCredit = 0, cCash = 0, cBank = 0;
             const cName = cleanPartyName(cust.name);
@@ -710,8 +740,8 @@ function generateStatement() {
 
       (customersList || []).forEach(cust => {
         if (!cust) return;
-        const cAgClean = cleanPartyName(cust.agent_name);
-        if (cAgClean === agClean) {
+        const cAg = getCustomerAgentName(cust);
+        if (cleanPartyName(cAg) === agClean) {
           let cOpening = parseFloat(cust.opening_balance) || 0;
           let cCredit = 0, cCash = 0, cBank = 0;
           const cName = cleanPartyName(cust.name);
@@ -909,7 +939,7 @@ function generateStatement() {
       allTx.forEach(t => {
         if (!t) return;
         const tClean = cleanPartyName(t.party_name);
-        if (tClean.startsWith(expClean) || tClean === expClean) {
+        if (tClean.startsWith(expClean) || tClean === cleanExp) {
           const tDate = cleanDate(t.date);
           const billAmt = (t.type === 'expense_bill') ? (parseFloat(t.credit_amount) || 0) : 0;
           const payAmt = (t.type === 'expense') ? (Math.abs(parseFloat(t.cash_amount) || 0) + Math.abs(parseFloat(t.bank_amount) || 0)) : 0;
@@ -921,7 +951,7 @@ function generateStatement() {
       allTx.forEach(t => {
         if (!t) return;
         const tClean = cleanPartyName(t.party_name);
-        if (tClean.startsWith(expClean) || tClean === expClean) {
+        if (tClean.startsWith(expClean) || tClean === cleanExp) {
           const tDate = cleanDate(t.date);
           if (tDate >= fromDate && tDate <= toDate) {
             const billAmt = (t.type === 'expense_bill') ? (parseFloat(t.credit_amount) || 0) : 0;
@@ -961,50 +991,78 @@ function generateStatement() {
 
   let tableHtml = "";
 
-  // TABLES RENDERING
+  // TABLES RENDERING WITH EMPTY FALLBACK ROW
   if (isAllCustomersMode) {
     tableHtml = `<table class="w-full border-collapse bg-white rounded-xl overflow-hidden shadow-sm table-fixed"><thead><tr class="bg-emerald-900 text-white font-black text-center border-b"><th class="p-1 w-6">#</th><th class="p-1 w-2/6 text-left">Customer</th><th class="p-1 w-1/6">Opening</th><th class="p-1 w-1/6">Sales</th><th class="p-1 w-1/6">Paid</th><th class="p-1 w-1/6 bg-emerald-950">Due (>10)</th></tr></thead><tbody class="divide-y divide-slate-100 font-bold">`;
-    customersConsolidatedSummary.forEach((r, idx) => {
-      tableHtml += `<tr class="text-center hover:bg-slate-50"><td class="p-1">${idx + 1}</td><td class="p-1 text-left truncate">${formatShortName(r.name)}</td><td class="p-1">${r.opening.toLocaleString('en-IN')}</td><td class="p-1 text-amber-700">${r.sales.toLocaleString('en-IN')}</td><td class="p-1 text-emerald-700">${r.paid.toLocaleString('en-IN')}</td><td class="p-1 font-black text-emerald-900">${r.closing.toLocaleString('en-IN')}</td></tr>`;
-    });
+    if (customersConsolidatedSummary.length === 0) {
+      tableHtml += `<tr><td colspan="6" class="p-4 text-center text-slate-400 font-bold">10 റിയാലിൽ കൂടുതൽ കുടിശ്ശികയുള്ള കസ്റ്റമർമാർ ഇല്ല</td></tr>`;
+    } else {
+      customersConsolidatedSummary.forEach((r, idx) => {
+        tableHtml += `<tr class="text-center hover:bg-slate-50"><td class="p-1">${idx + 1}</td><td class="p-1 text-left truncate">${formatShortName(r.name)}</td><td class="p-1">${r.opening.toLocaleString('en-IN')}</td><td class="p-1 text-amber-700">${r.sales.toLocaleString('en-IN')}</td><td class="p-1 text-emerald-700">${r.paid.toLocaleString('en-IN')}</td><td class="p-1 font-black text-emerald-900">${r.closing.toLocaleString('en-IN')}</td></tr>`;
+      });
+    }
     tableHtml += `</tbody></table>`;
   } else if (isAllVendorsMode) {
     tableHtml = `<table class="w-full border-collapse bg-white rounded-xl overflow-hidden shadow-sm table-fixed"><thead><tr class="bg-blue-900 text-white font-black text-center border-b"><th class="p-1 w-6">#</th><th class="p-1 w-2/6 text-left">Vendor</th><th class="p-1 w-1/6">Opening</th><th class="p-1 w-1/6">Purchase</th><th class="p-1 w-1/6">Paid</th><th class="p-1 w-1/6 bg-blue-950">Due (>10)</th></tr></thead><tbody class="divide-y divide-slate-100 font-bold">`;
-    vendorsConsolidatedSummary.forEach((r, idx) => {
-      tableHtml += `<tr class="text-center hover:bg-slate-50"><td class="p-1">${idx + 1}</td><td class="p-1 text-left truncate">${formatShortName(r.name)}</td><td class="p-1">${r.opening.toLocaleString('en-IN')}</td><td class="p-1 text-blue-700">${r.purchases.toLocaleString('en-IN')}</td><td class="p-1 text-emerald-700">${r.paid.toLocaleString('en-IN')}</td><td class="p-1 font-black text-rose-700">${r.closing.toLocaleString('en-IN')}</td></tr>`;
-    });
+    if (vendorsConsolidatedSummary.length === 0) {
+      tableHtml += `<tr><td colspan="6" class="p-4 text-center text-slate-400 font-bold">10 റിയാലിൽ കൂടുതൽ കുടിശ്ശികയുള്ള വെണ്ടർമാർ ഇല്ല</td></tr>`;
+    } else {
+      vendorsConsolidatedSummary.forEach((r, idx) => {
+        tableHtml += `<tr class="text-center hover:bg-slate-50"><td class="p-1">${idx + 1}</td><td class="p-1 text-left truncate">${formatShortName(r.name)}</td><td class="p-1">${r.opening.toLocaleString('en-IN')}</td><td class="p-1 text-blue-700">${r.purchases.toLocaleString('en-IN')}</td><td class="p-1 text-emerald-700">${r.paid.toLocaleString('en-IN')}</td><td class="p-1 font-black text-rose-700">${r.closing.toLocaleString('en-IN')}</td></tr>`;
+      });
+    }
     tableHtml += `</tbody></table>`;
   } else if (type === 'agent' && isAllAgentsMode) {
     tableHtml = `<table class="w-full border-collapse bg-white rounded-xl overflow-hidden shadow-sm table-fixed"><thead><tr class="bg-indigo-900 text-white font-black text-center border-b"><th class="p-1 w-6">#</th><th class="p-1 w-2/6 text-left">Route Agent</th><th class="p-1 w-1/6">Parties</th><th class="p-1 w-1/6">Sales</th><th class="p-1 w-1/6">Collected</th><th class="p-1 w-1/6 bg-indigo-950">Due (>10)</th></tr></thead><tbody class="divide-y divide-slate-100 font-bold">`;
-    agentsConsolidatedSummary.forEach((r, idx) => {
-      tableHtml += `<tr class="text-center hover:bg-slate-50"><td class="p-1">${idx + 1}</td><td class="p-1 text-left truncate">${formatShortName(r.name)}</td><td class="p-1 text-slate-700">${r.custCount}</td><td class="p-1 text-amber-700">${r.sales.toLocaleString('en-IN')}</td><td class="p-1 text-emerald-700">${r.paid.toLocaleString('en-IN')}</td><td class="p-1 font-black text-indigo-950">${r.closing.toLocaleString('en-IN')}</td></tr>`;
-    });
+    if (agentsConsolidatedSummary.length === 0) {
+      tableHtml += `<tr><td colspan="6" class="p-4 text-center text-slate-400 font-bold">10 റിയാലിൽ കൂടുതൽ കുടിശ്ശികയുള്ള ഏജന്റുമാർ ഇല്ല</td></tr>`;
+    } else {
+      agentsConsolidatedSummary.forEach((r, idx) => {
+        tableHtml += `<tr class="text-center hover:bg-slate-50"><td class="p-1">${idx + 1}</td><td class="p-1 text-left truncate">${formatShortName(r.name)}</td><td class="p-1 text-slate-700">${r.custCount}</td><td class="p-1 text-amber-700">${r.sales.toLocaleString('en-IN')}</td><td class="p-1 text-emerald-700">${r.paid.toLocaleString('en-IN')}</td><td class="p-1 font-black text-indigo-950">${r.closing.toLocaleString('en-IN')}</td></tr>`;
+      });
+    }
     tableHtml += `</tbody></table>`;
   } else if (type === 'agent' && !isAllAgentsMode) {
     tableHtml = `<table class="w-full border-collapse bg-white rounded-xl overflow-hidden shadow-sm table-fixed"><thead><tr class="bg-indigo-900 text-white font-black text-center border-b"><th class="p-1 w-6">#</th><th class="p-1 w-2/6 text-left">Customer</th><th class="p-1 w-1/6">Opening</th><th class="p-1 w-1/6">Sales</th><th class="p-1 w-1/6">Paid</th><th class="p-1 w-1/6 bg-indigo-950">Due (>10)</th></tr></thead><tbody class="divide-y divide-slate-100 font-bold">`;
-    singleAgentCustomersSummary.forEach((r, idx) => {
-      tableHtml += `<tr class="text-center hover:bg-slate-50"><td class="p-1">${idx + 1}</td><td class="p-1 text-left truncate">${formatShortName(r.name)}</td><td class="p-1">${r.opening.toLocaleString('en-IN')}</td><td class="p-1 text-amber-700">${r.sales.toLocaleString('en-IN')}</td><td class="p-1 text-emerald-700">${r.paid.toLocaleString('en-IN')}</td><td class="p-1 font-black text-indigo-950">${r.closing.toLocaleString('en-IN')}</td></tr>`;
-    });
+    if (singleAgentCustomersSummary.length === 0) {
+      tableHtml += `<tr><td colspan="6" class="p-4 text-center text-slate-400 font-bold">ഈ ഏജന്റിന് കീഴിൽ 10 റിയാലിൽ കൂടുതൽ കുടിശ്ശികയുള്ള കസ്റ്റമർമാർ ഇല്ല</td></tr>`;
+    } else {
+      singleAgentCustomersSummary.forEach((r, idx) => {
+        tableHtml += `<tr class="text-center hover:bg-slate-50"><td class="p-1">${idx + 1}</td><td class="p-1 text-left truncate">${formatShortName(r.name)}</td><td class="p-1">${r.opening.toLocaleString('en-IN')}</td><td class="p-1 text-amber-700">${r.sales.toLocaleString('en-IN')}</td><td class="p-1 text-emerald-700">${r.paid.toLocaleString('en-IN')}</td><td class="p-1 font-black text-indigo-950">${r.closing.toLocaleString('en-IN')}</td></tr>`;
+      });
+    }
     tableHtml += `</tbody></table>`;
   } else if (type === 'employee' && isAllEmployeesMode) {
     tableHtml = `<table class="w-full border-collapse bg-white rounded-xl overflow-hidden shadow-sm table-fixed"><thead><tr class="bg-purple-900 text-white font-black text-center border-b"><th class="p-1 w-6">#</th><th class="p-1 w-2/6 text-left">Staff Name</th><th class="p-1 w-1/6">Salary</th><th class="p-1 w-1/6">Paid</th><th class="p-1 w-1/6 bg-purple-950">Pending (>10)</th></tr></thead><tbody class="divide-y divide-slate-100 font-bold">`;
-    employeesConsolidatedSummary.forEach((r, idx) => {
-      tableHtml += `<tr class="text-center hover:bg-slate-50"><td class="p-1">${idx + 1}</td><td class="p-1 text-left truncate">${formatShortName(r.name)}</td><td class="p-1">${r.salary.toLocaleString('en-IN')}</td><td class="p-1 text-emerald-700">${r.paid.toLocaleString('en-IN')}</td><td class="p-1 font-black text-purple-950">${r.closing.toLocaleString('en-IN')}</td></tr>`;
-    });
+    if (employeesConsolidatedSummary.length === 0) {
+      tableHtml += `<tr><td colspan="6" class="p-4 text-center text-slate-400 font-bold">10 റിയാലിൽ കൂടുതൽ ശമ്പളം ബാക്കിയുള്ളവർ ഇല്ല</td></tr>`;
+    } else {
+      employeesConsolidatedSummary.forEach((r, idx) => {
+        tableHtml += `<tr class="text-center hover:bg-slate-50"><td class="p-1">${idx + 1}</td><td class="p-1 text-left truncate">${formatShortName(r.name)}</td><td class="p-1">${r.salary.toLocaleString('en-IN')}</td><td class="p-1 text-emerald-700">${r.paid.toLocaleString('en-IN')}</td><td class="p-1 font-black text-purple-950">${r.closing.toLocaleString('en-IN')}</td></tr>`;
+      });
+    }
     tableHtml += `</tbody></table>`;
   } else if (isAllUtilityBillsMode) {
     tableHtml = `<table class="w-full border-collapse bg-white rounded-xl overflow-hidden shadow-sm table-fixed"><thead><tr class="bg-amber-900 text-white font-black text-center border-b"><th class="p-1 w-6">#</th><th class="p-1 w-2/6 text-left">Utility/Bill</th><th class="p-1 w-1/6">Opening</th><th class="p-1 w-1/6">New Bills</th><th class="p-1 w-1/6">Paid</th><th class="p-1 w-1/6 bg-amber-950">Due (>10)</th></tr></thead><tbody class="divide-y divide-slate-100 font-bold">`;
-    utilitiesConsolidatedSummary.forEach((r, idx) => {
-      tableHtml += `<tr class="text-center hover:bg-slate-50"><td class="p-1">${idx + 1}</td><td class="p-1 text-left truncate">${formatShortName(r.name)}</td><td class="p-1">${r.opening.toLocaleString('en-IN')}</td><td class="p-1 text-indigo-700">${r.bills.toLocaleString('en-IN')}</td><td class="p-1 text-emerald-700">${r.paid.toLocaleString('en-IN')}</td><td class="p-1 font-black text-amber-900">${r.closing.toLocaleString('en-IN')}</td></tr>`;
-    });
+    if (utilitiesConsolidatedSummary.length === 0) {
+      tableHtml += `<tr><td colspan="6" class="p-4 text-center text-slate-400 font-bold">10 റിയാലിൽ കൂടുതൽ കുടിശ്ശികയുള്ള ബില്ലുകൾ ഇല്ല</td></tr>`;
+    } else {
+      utilitiesConsolidatedSummary.forEach((r, idx) => {
+        tableHtml += `<tr class="text-center hover:bg-slate-50"><td class="p-1">${idx + 1}</td><td class="p-1 text-left truncate">${formatShortName(r.name)}</td><td class="p-1">${r.opening.toLocaleString('en-IN')}</td><td class="p-1 text-indigo-700">${r.bills.toLocaleString('en-IN')}</td><td class="p-1 text-emerald-700">${r.paid.toLocaleString('en-IN')}</td><td class="p-1 font-black text-amber-900">${r.closing.toLocaleString('en-IN')}</td></tr>`;
+      });
+    }
     tableHtml += `</tbody></table>`;
   } else {
     tableHtml = `<table class="w-full border-collapse bg-white rounded-xl overflow-hidden shadow-sm table-fixed"><thead><tr class="bg-indigo-900 text-white font-black text-center border-b"><th class="p-1 w-1/5 text-left">Date</th><th class="p-1 w-2/5 text-left">Particulars</th><th class="p-1 w-1/5">Paid</th><th class="p-1 w-1/5">Bill</th><th class="p-1 w-1/5">Balance</th></tr></thead><tbody class="divide-y divide-slate-100 font-bold">`;
-    statementRows.forEach(r => {
-      let payStr = (r.cash + r.bank > 0) ? `${r.cash + r.bank}` : '-';
-      let billStr = (r.bill > 0) ? `${r.bill}` : '-';
-      tableHtml += `<tr class="text-center hover:bg-slate-50"><td class="p-1 text-left text-slate-600">${r.date}</td><td class="p-1 text-left truncate">${formatShortName(r.desc)}</td><td class="p-1 text-emerald-700">${payStr}</td><td class="p-1 text-amber-700">${billStr}</td><td class="p-1 font-black">${r.bal.toLocaleString('en-IN')}</td></tr>`;
-    });
+    if (statementRows.length === 0) {
+      tableHtml += `<tr><td colspan="5" class="p-4 text-center text-slate-400 font-bold">ഈ മാസത്തിൽ ഇടപാടുകൾ ഒന്നും ഇല്ല</td></tr>`;
+    } else {
+      statementRows.forEach(r => {
+        let payStr = (r.cash + r.bank > 0) ? `${r.cash + r.bank}` : '-';
+        let billStr = (r.bill > 0) ? `${r.bill}` : '-';
+        tableHtml += `<tr class="text-center hover:bg-slate-50"><td class="p-1 text-left text-slate-600">${r.date}</td><td class="p-1 text-left truncate">${formatShortName(r.desc)}</td><td class="p-1 text-emerald-700">${payStr}</td><td class="p-1 text-amber-700">${billStr}</td><td class="p-1 font-black">${r.bal.toLocaleString('en-IN')}</td></tr>`;
+      });
+    }
     tableHtml += `</tbody></table>`;
   }
 
@@ -1071,7 +1129,7 @@ function downloadMasterExcel() {
     const custData = customersList.map(c => ({
       "Name": c.name,
       "Type": c.type || 'credit',
-      "Agent": c.agent_name || '',
+      "Agent": getCustomerAgentName(c),
       "Opening_Balance": c.opening_balance || 0,
       "Credit_Limit": c.credit_limit || 0
     }));
