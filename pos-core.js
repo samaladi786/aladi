@@ -157,13 +157,14 @@ function updateNetworkStatus() {
 window.addEventListener('online', updateNetworkStatus);
 window.addEventListener('offline', updateNetworkStatus);
 
-// 4-DIGIT BINDING ENFORCER
+// 4-DIGIT AUTO-SUBMIT & NUMERIC KEYPAD BINDING
 function setup4DigitPinInputs() {
   const loginInp = document.getElementById("loginPasswordInput");
   if (loginInp) {
     loginInp.setAttribute("maxlength", "4");
     loginInp.setAttribute("inputmode", "numeric");
     loginInp.setAttribute("pattern", "[0-9]*");
+    loginInp.setAttribute("autocomplete", "current-password");
     loginInp.oninput = function() {
       this.value = this.value.replace(/[^0-9]/g, '').slice(0, 4);
       if (this.value.length === 4) {
@@ -225,6 +226,13 @@ function initAppEngine() {
 
   updateNetworkStatus();
   checkOfflineQueueUI();
+
+  // 1. ഓട്ടോമാറ്റിക് ഡാറ്റാ റീഫ്രഷ് (ഓരോ 5 മിനിറ്റിലും ബാക്ക്‌ഗ്രൗണ്ടിൽ സിങ്ക് ആകുന്നു)
+  setInterval(() => {
+    if (navigator.onLine && supabaseClient && !document.hidden) {
+      fetchAllData();
+    }
+  }, 5 * 60 * 1000);
 
   if (window.lucide) lucide.createIcons();
 }
@@ -320,7 +328,7 @@ function goToDesktopPortal() {
     return;
   }
   pendingAction = 'open_desktop_portal';
-  document.getElementById("pinSubText").innerText = "ഡെസ്ക്ടോപ്പ് പോർട്ടലിലേക്ക് പോകാൻ അഡ്മിൻ മാസ്റ്റർ പിൻ നൽകുക";
+  document.getElementById("pinSubText").innerText = "ഡെസ്ക്ടോപ്പിലേക്ക് പോകാൻ ഷോപ്പ് പിൻ അല്ലെങ്കിൽ മാസ്റ്റർ പിൻ നൽകുക";
   const pInp = document.getElementById("pinInput");
   if (pInp) {
     pInp.value = "";
@@ -1300,7 +1308,7 @@ async function syncOfflineQueue() {
   }
 }
 
-// TRANSACTIONS SAVING
+// TRANSACTIONS SAVING (WITH DUPLICATE ENTRY DETECTION)
 async function saveSaleEntry() {
   let rawName = document.getElementById("saleCustomerInput").value.trim().toUpperCase();
   if (!rawName) return alert("കസ്റ്റമർ പേര് നൽകുക!");
@@ -1326,6 +1334,25 @@ async function saveSaleEntry() {
 
   if (cash <= 0 && bank <= 0 && credit <= 0) return alert("തുക നൽകുക!");
 
+  // 2. ഡബിൾ എൻട്രി ഡിറ്റക്ഷൻ (സെയിൽസ്)
+  const selDate = getSelectedDate();
+  const isDuplicate = transactionsList.some(t => {
+    if (!t) return false;
+    const isSameDate = (cleanDate(t.date) === cleanDate(selDate));
+    const isSameParty = (cleanPartyName(t.party_name) === cleanPartyName(name));
+    const isSameCash = (Math.abs(parseFloat(t.cash_amount) || 0) === cash);
+    const isSameBank = (Math.abs(parseFloat(t.bank_amount) || 0) === bank);
+    const isSameCredit = ((parseFloat(t.credit_amount) || 0) === credit);
+    return isSameDate && isSameParty && isSameCash && isSameBank && isSameCredit && t.type === 'sale';
+  });
+
+  if (isDuplicate) {
+    const totalAmt = cash + bank + credit;
+    if (!confirm(`⚠️ മുന്നറിയിപ്പ് (Double Entry Alert):\n'${name}' എന്ന കസ്റ്റമർക്ക് ഇന്ന് ഇതേ തുകയുടെ (${totalAmt} SR) ഒരു സെയിൽസ് എൻട്രി ഇതിനകം രേഖപ്പെടുത്തിയിട്ടുണ്ട്!\n\nവീണ്ടും സേവ് ചെയ്യണമെന്ന് ഉറപ്പാണോ?`)) {
+      return;
+    }
+  }
+
   if (cust && cust.credit_limit && parseFloat(cust.credit_limit) > 0 && credit > 0) {
     const limit = parseFloat(cust.credit_limit);
     let liveBal = parseFloat(cust.opening_balance) || 0;
@@ -1342,7 +1369,7 @@ async function saveSaleEntry() {
   }
 
   const payload = {
-    date: getSelectedDate(),
+    date: selDate,
     type: 'sale',
     party_name: name,
     cash_amount: cash,
@@ -1401,8 +1428,27 @@ async function savePurchaseEntry() {
 
   if (cash <= 0 && bank <= 0 && credit <= 0) return alert("തുക നൽകുക!");
 
+  // 2. ഡബിൾ എൻട്രി ഡിറ്റക്ഷൻ (പർച്ചേസ്)
+  const selDate = getSelectedDate();
+  const isDuplicate = transactionsList.some(t => {
+    if (!t) return false;
+    const isSameDate = (cleanDate(t.date) === cleanDate(selDate));
+    const isSameParty = (cleanPartyName(t.party_name) === cleanPartyName(name));
+    const isSameCash = (Math.abs(parseFloat(t.cash_amount) || 0) === cash);
+    const isSameBank = (Math.abs(parseFloat(t.bank_amount) || 0) === bank);
+    const isSameCredit = ((parseFloat(t.credit_amount) || 0) === credit);
+    return isSameDate && isSameParty && isSameCash && isSameBank && isSameCredit && t.type === 'purchase';
+  });
+
+  if (isDuplicate) {
+    const totalAmt = cash + bank + credit;
+    if (!confirm(`⚠️ മുന്നറിയിപ്പ് (Double Entry Alert):\n'${name}' എന്ന വെണ്ടർക്ക് ഇന്ന് ഇതേ തുകയുടെ (${totalAmt} SR) ഒരു പർച്ചേസ് എൻട്രി ഇതിനകം രേഖപ്പെടുത്തിയിട്ടുണ്ട്!\n\nവീണ്ടും സേവ് ചെയ്യണമെന്ന് ഉറപ്പാണോ?`)) {
+      return;
+    }
+  }
+
   const payload = {
-    date: getSelectedDate(),
+    date: selDate,
     type: 'purchase',
     party_name: name,
     cash_amount: -cash,
@@ -1447,11 +1493,28 @@ async function saveUnifiedExpSalEntry() {
   if (cash <= 0 && bank <= 0) return alert("തുക നൽകുക!");
 
   const emp = employeesList.find(e => cleanPartyName(e.name) === cleanPartyName(rawVal));
+  const selDate = getSelectedDate();
   let payload = {};
 
   if (emp) {
+    // 2. ഡബിൾ എൻട്രി ഡിറ്റക്ഷൻ (സാലറി)
+    const isDuplicate = transactionsList.some(t => {
+      if (!t) return false;
+      const isSameDate = (cleanDate(t.date) === cleanDate(selDate));
+      const isSameStaff = cleanPartyName(t.party_name).includes(cleanPartyName(emp.name));
+      const isSameCash = (Math.abs(parseFloat(t.cash_amount) || 0) === cash);
+      const isSameBank = (Math.abs(parseFloat(t.bank_amount) || 0) === bank);
+      return isSameDate && isSameStaff && isSameCash && isSameBank && t.type === 'salary';
+    });
+
+    if (isDuplicate) {
+      if (!confirm(`⚠️ മുന്നറിയിപ്പ് (Double Entry Alert):\n'${emp.name}' എന്ന സ്റ്റാഫിന് ഇന്ന് ഇതേ തുകയുടെ (${cash + bank} SR) സാലറി/അഡ്വാൻസ് നൽകിയിട്ടുണ്ട്!\n\nവീണ്ടും സേവ് ചെയ്യണമെന്ന് ഉറപ്പാണോ?`)) {
+        return;
+      }
+    }
+
     payload = {
-      date: getSelectedDate(),
+      date: selDate,
       type: 'salary',
       party_name: `Staff: ${emp.name} - ${note || 'സാലറി/അഡ്വാൻസ്'}`,
       cash_amount: -cash,
@@ -1475,8 +1538,24 @@ async function saveUnifiedExpSalEntry() {
       populateDropdowns();
     }
 
+    // 2. ഡബിൾ എൻട്രി ഡിറ്റക്ഷൻ (ചിലവുകൾ)
+    const isDuplicate = transactionsList.some(t => {
+      if (!t) return false;
+      const isSameDate = (cleanDate(t.date) === cleanDate(selDate));
+      const isSameExp = cleanPartyName(t.party_name).startsWith(cleanPartyName(expName));
+      const isSameCash = (Math.abs(parseFloat(t.cash_amount) || 0) === cash);
+      const isSameBank = (Math.abs(parseFloat(t.bank_amount) || 0) === bank);
+      return isSameDate && isSameExp && isSameCash && isSameBank && t.type === 'expense';
+    });
+
+    if (isDuplicate) {
+      if (!confirm(`⚠️ മുന്നറിയിപ്പ് (Double Entry Alert):\n'${expName}' എന്ന ചിലവിലേക്ക് ഇന്ന് ഇതേ തുക (${cash + bank} SR) നൽകിയിട്ടുണ്ട്!\n\nവീണ്ടും സേവ് ചെയ്യണമെന്ന് ഉറപ്പാണോ?`)) {
+        return;
+      }
+    }
+
     payload = {
-      date: getSelectedDate(),
+      date: selDate,
       type: 'expense',
       party_name: `${expName} (${note || expName})`,
       cash_amount: -cash,
@@ -1839,13 +1918,11 @@ async function verifyPinAndExecute() {
     const matchedShop = (shopsArr || []).find(s => String(s.pin).trim() === pinVal);
 
     if (isMaster) {
-      // മാസ്റ്റർ പിൻ ആണെങ്കിൽ ഫുൾ അഡ്മിൻ ആക്സസോടെ തുറക്കുന്നു
       sessionStorage.setItem("ALNASSR_LOGGED_IN", "true");
       sessionStorage.setItem("ALNASSR_USER_ROLE", "admin");
       closePinModal();
       window.open("index.html", "_blank");
     } else if (matchedShop) {
-      // ഷോപ്പ് പിൻ ആണെങ്കിൽ ആ ഷോപ്പ് മാത്രം സെലക്ട് ചെയ്ത് തുറക്കുന്നു
       sessionStorage.setItem("ALNASSR_LOGGED_IN", "true");
       sessionStorage.setItem("ALNASSR_USER_ROLE", "shop");
       sessionStorage.setItem("ALNASSR_ACTIVE_SHOP_ID", matchedShop.id);
@@ -2286,8 +2363,7 @@ async function saveEditedMasterItem() {
     const payload = { name: newName };
     if (navigator.onLine && supabaseClient) {
       const { error } = item.id 
-        ? await supabaseClient.from('agents').update(payload).eq('id', item.id)
-        : await supabaseClient.from('agents').update(payload).eq('name', originalName);
+        ? await supabaseClient.from('agents').update(payload).eq('id', item.id);
       if (error) return alert("ക്ലൗഡിലേക്ക് സേവ് ചെയ്യാൻ കഴിഞ്ഞില്ല: " + error.message);
     }
     item.name = newName;
