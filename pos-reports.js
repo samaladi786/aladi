@@ -6,7 +6,7 @@ var currentReportMode = 'daily';
 var currentReportDataForWA = {};
 var currentStatementDataForWA = null;
 
-// കസ്റ്റമറിൽ നിന്ന് ഏജന്റിന്റെ പേര് ഏത് ഫീൽഡിൽ നിന്നായാലും (agent_name, agent, agent_id) കൃത്യമായി കണ്ടെത്തുന്നു
+// Customer-il ninnu Agent-inte peru ethoru field aayalum (agent_name, agent, agent_id) krithyamayi edukkunnu
 function getCustomerAgentName(cust) {
   if (!cust) return '';
   if (cust.agent_name && String(cust.agent_name).trim()) return String(cust.agent_name).trim();
@@ -294,7 +294,7 @@ function renderReportData(mode) {
   let totalDayOpening = dayOpeningCash + dayOpeningBank;
   let totalTargetClosing = targetClosingCash + targetClosingBank;
 
-  // 15% VAT CALCULATIONS (Tax Inclusive)
+  // 15% VAT CALCULATIONS
   const vatOutput = totSale > 0 ? (totSale - (totSale / 1.15)) : 0;
   const vatInput = totPur > 0 ? (totPur - (totPur / 1.15)) : 0;
   const vatNet = vatOutput - vatInput;
@@ -422,41 +422,53 @@ function renderReportData(mode) {
 }
 
 // ========================================================
-// 3. STATEMENTS ENGINE (CUSTOMERS, VENDORS, AGENTS, STAFF, UTILITIES)
+// 3. STATEMENTS ENGINE (SELECT DROPDOWN POPULATION)
 // ========================================================
 function populateStatementPartyDatalist() {
   const type = document.getElementById("statPartyType").value;
+  const sel = document.getElementById("statPartySelect") || document.getElementById("statPartyInput");
   const dl = document.getElementById("statPartyDatalist");
-  const inp = document.getElementById("statPartyInput");
-  dl.innerHTML = "";
+
+  if (sel) sel.innerHTML = "";
+  if (dl) dl.innerHTML = "";
+
+  function addOption(val, label) {
+    if (sel && sel.tagName === 'SELECT') {
+      const opt = document.createElement("option");
+      opt.value = val;
+      opt.textContent = label || val;
+      sel.appendChild(opt);
+    } else if (sel && sel.tagName === 'INPUT') {
+      if (!sel.value) sel.value = val;
+    }
+    if (dl) {
+      dl.innerHTML += `<option value="${val}">`;
+    }
+  }
 
   if (type === 'customer') {
+    addOption("ALL CUSTOMERS", "📋 ALL CUSTOMERS (ആകെ ക്രെഡിറ്റ് കസ്റ്റമർമാർ)");
     const creditCustomers = (customersList || []).filter(c => c && (c.type || '').toLowerCase() === 'credit');
-    dl.innerHTML += `<option value="ALL CUSTOMERS">`;
     creditCustomers.forEach(c => {
-      if (c && c.name) dl.innerHTML += `<option value="${c.name.toUpperCase()}">`;
+      if (c && c.name) addOption(c.name.toUpperCase(), c.name.toUpperCase());
     });
-    if (inp) inp.value = "ALL CUSTOMERS";
   } else if (type === 'vendor') {
-    dl.innerHTML += `<option value="ALL VENDORS">`;
+    addOption("ALL VENDORS", "📋 ALL VENDORS (ആകെ വെണ്ടർമാർ)");
     vendorsList.forEach(v => {
-      if (v && v.name) dl.innerHTML += `<option value="${v.name.toUpperCase()}">`;
+      if (v && v.name) addOption(v.name.toUpperCase(), v.name.toUpperCase());
     });
-    if (inp) inp.value = "ALL VENDORS";
   } else if (type === 'employee') {
-    dl.innerHTML += `<option value="ALL EMPLOYEES">`;
+    addOption("ALL EMPLOYEES", "📋 ALL EMPLOYEES (ആകെ സ്റ്റാഫ്)");
     employeesList.forEach(em => {
       if (em && em.name) {
         let label = em.status === 'stopped' ? `${em.name.toUpperCase()} (Stopped)` : em.name.toUpperCase();
-        dl.innerHTML += `<option value="${label}">`;
+        addOption(label, `👥 ${label}`);
       }
     });
-    if (inp) inp.value = "ALL EMPLOYEES";
   } else if (type === 'agent') {
-    dl.innerHTML += `<option value="ALL AGENTS">`;
+    addOption("ALL AGENTS", "📋 ALL AGENTS (ആകെ റൂട്ട് ഏജന്റുമാർ)");
     let allAgentNames = new Set();
     
-    // ഏജന്റ് മാസ്റ്ററിൽ നിന്നും കസ്റ്റമർ വിവരങ്ങളിൽ നിന്നും ഏജന്റുമാരെ കണ്ടെത്തുന്നു
     (agentsList || []).forEach(a => { if (a && a.name) allAgentNames.add(a.name.trim().toUpperCase()); });
     (customersList || []).forEach(c => { 
       const ag = getCustomerAgentName(c);
@@ -464,15 +476,13 @@ function populateStatementPartyDatalist() {
     });
 
     allAgentNames.forEach(ag => {
-      dl.innerHTML += `<option value="${ag}">`;
+      addOption(ag, `👤 ${ag}`);
     });
-    if (inp) inp.value = "ALL AGENTS";
   } else if (type === 'expense') {
-    dl.innerHTML += `<option value="ALL UTILITY BILLS">`;
+    addOption("ALL UTILITY BILLS", "📋 ALL UTILITY BILLS (ആകെ ബില്ലുകൾ)");
     expensesMasterList.forEach(ex => {
-      if (ex && ex.name) dl.innerHTML += `<option value="${ex.name.toUpperCase()}">`;
+      if (ex && ex.name) addOption(ex.name.toUpperCase(), `⚡ ${ex.name.toUpperCase()}`);
     });
-    if (inp) inp.value = "ALL UTILITY BILLS";
   }
 
   generateStatement();
@@ -480,23 +490,22 @@ function populateStatementPartyDatalist() {
 
 function generateStatement() {
   const type = document.getElementById("statPartyType").value;
-  let partyVal = (document.getElementById("statPartyInput")?.value || "").trim().toUpperCase();
+  const sel = document.getElementById("statPartySelect") || document.getElementById("statPartyInput");
+  let partyVal = (sel ? sel.value : "").trim().toUpperCase();
   let monthVal = (document.getElementById("statMonth")?.value || "").trim();
 
-  // മാസം സെലക്ട് ചെയ്തിട്ടില്ലെങ്കിൽ തനിയെ ഈ മാസം സെറ്റ് ചെയ്യുന്നു
   if (!monthVal) {
     monthVal = (document.getElementById("mobileFilterDate")?.value || getSaudiBusinessDate()).substring(0, 7);
     if (document.getElementById("statMonth")) document.getElementById("statMonth").value = monthVal;
   }
 
-  // പേര് കൊടുത്തിട്ടില്ലെങ്കിൽ തനിയെ 'ALL' മോഡ് ആക്കുന്നു
   if (!partyVal) {
     if (type === 'customer') partyVal = "ALL CUSTOMERS";
     else if (type === 'vendor') partyVal = "ALL VENDORS";
     else if (type === 'agent') partyVal = "ALL AGENTS";
     else if (type === 'employee') partyVal = "ALL EMPLOYEES";
     else if (type === 'expense') partyVal = "ALL UTILITY BILLS";
-    if (document.getElementById("statPartyInput")) document.getElementById("statPartyInput").value = partyVal;
+    if (sel) sel.value = partyVal;
   }
 
   const fromDate = `${monthVal}-01`;
@@ -592,14 +601,13 @@ function generateStatement() {
       const periodPaid = periodCash + periodBank;
       const custClosingBal = custOpeningBal + periodCredit - periodPaid;
       
-      // 10 റിയാലിൽ താഴെയുള്ളവ ഒഴിവാക്കുന്നു (<= 10 filter)
+      // 10 riyal-il thaazheyullava ozhivakkunnu
       if (custClosingBal <= 10) return;
 
       totalCustOpening += custOpeningBal; totalCustSales += periodCredit; totalCustPaid += periodPaid; totalCustClosing += custClosingBal;
       customersConsolidatedSummary.push({ name: cust.name, opening: custOpeningBal, sales: periodCredit, paid: periodPaid, closing: custClosingBal });
     });
 
-    // ഉയർന്ന തുക മുകളിൽ വരുന്ന രീതിയിൽ സോർട്ട് ചെയ്യുന്നു (Highest to Lowest)
     customersConsolidatedSummary.sort((a, b) => b.closing - a.closing);
     openingBal = totalCustOpening; totalSalesOrBills = totalCustSales; totalPaidOrCollected = totalCustPaid; runningBal = totalCustClosing;
   }
@@ -654,7 +662,6 @@ function generateStatement() {
       const periodPaid = periodCash + periodBank;
       const vendClosingBal = vendOpeningBal + periodCredit - periodPaid;
       
-      // 10 റിയാലിൽ താഴെയുള്ളവ ഒഴിവാക്കുന്നു (<= 10 filter)
       if (vendClosingBal <= 10) return;
 
       totalVendOpening += vendOpeningBal; totalVendPurchases += periodCredit; totalVendPaid += periodPaid; totalVendClosing += vendClosingBal;
@@ -665,7 +672,7 @@ function generateStatement() {
     openingBal = totalVendOpening; totalSalesOrBills = totalVendPurchases; totalPaidOrCollected = totalVendPaid; runningBal = totalVendClosing;
   }
 
-  // 3. AGENT STATEMENT (ROBUST LINKAGE VIA ID & NAME)
+  // 3. AGENT STATEMENT
   else if (type === 'agent') {
     if (isAllAgentsMode) {
       partyName = `TOTAL ROUTE AGENTS STATEMENT`;
@@ -712,7 +719,6 @@ function generateStatement() {
           }
         });
 
-        // 10 റിയാലിൽ താഴെയുള്ള ബാക്കികൾ ഒഴിവാക്കുന്നു
         if (agClosing <= 10) return;
 
         totalAgOpening += agOpening;
@@ -733,7 +739,6 @@ function generateStatement() {
       agentsConsolidatedSummary.sort((a, b) => b.closing - a.closing);
       openingBal = totalAgOpening; totalSalesOrBills = totalAgSales; totalPaidOrCollected = totalAgPaid; runningBal = totalAgClosing;
     } else {
-      // നിർദ്ദിഷ്ട ഏജന്റിന് കീഴിലുള്ള കസ്റ്റമർമാരുടെ ലിസ്റ്റ്
       const agClean = cleanPartyName(partyVal);
       partyName = `AGENT: ${partyVal} - ROUTE CUSTOMERS STATEMENT`;
       let totalAgOpening = 0, totalAgSales = 0, totalAgPaid = 0, totalAgClosing = 0;
@@ -760,7 +765,6 @@ function generateStatement() {
           const cPaid = cCash + cBank;
           const cBal = cOpening + cCredit - cPaid;
 
-          // 10 റിയാലിൽ താഴെയുള്ള കസ്റ്റമർമാരെ ഒഴിവാക്കുന്നു
           if (cBal <= 10) return;
 
           totalAgOpening += cOpening;
@@ -778,7 +782,6 @@ function generateStatement() {
         }
       });
 
-      // ഏറ്റവും കൂടുതൽ കുടിശ്ശികയുള്ള കസ്റ്റമർ മുകളിൽ വരുന്നു
       singleAgentCustomersSummary.sort((a, b) => b.closing - a.closing);
       openingBal = totalAgOpening; totalSalesOrBills = totalAgSales; totalPaidOrCollected = totalAgPaid; runningBal = totalAgClosing;
     }
@@ -794,7 +797,6 @@ function generateStatement() {
         if (!emp) return;
         const pendingBal = calculateEmployeePendingBalance(emp, toDate);
 
-        // 10 റിയാലിൽ താഴെ ശമ്പളം ബാക്കിയുള്ളവരെ ഒഴിവാക്കുന്നു
         if (pendingBal <= 10) return;
 
         let staffPaid = 0;
@@ -1377,7 +1379,7 @@ async function requestRestoreBackup(event) {
       }
 
       populateDropdowns();
-      renderQuickTotalsAndRecent();
+      renderActiveMasterList();
       closeBackupModal();
       alert("സിസ്റ്റം ബാക്കപ്പ് വിജയകരമായി റീസ്റ്റോർ ചെയ്തു!");
     } catch (err) {
