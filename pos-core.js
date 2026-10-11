@@ -227,7 +227,7 @@ function initAppEngine() {
   updateNetworkStatus();
   checkOfflineQueueUI();
 
-  // 1. ഓട്ടോമാറ്റിക് ഡാറ്റാ റീഫ്രഷ് (ഓരോ 5 മിനിറ്റിലും ബാക്ക്‌ഗ്രൗണ്ടിൽ സിങ്ക് ആകുന്നു)
+  // 1. ഓട്ടോമാറ്റിക് ഡാറ്റാ റീഫ്രഷ് (ഓരോ 5 മിനിറ്റിലും പശ്ചാത്തലത്തിൽ സിങ്ക് ആകുന്നു)
   setInterval(() => {
     if (navigator.onLine && supabaseClient && !document.hidden) {
       fetchAllData();
@@ -1334,7 +1334,7 @@ async function saveSaleEntry() {
 
   if (cash <= 0 && bank <= 0 && credit <= 0) return alert("തുക നൽകുക!");
 
-  // 2. ഡബിൾ എൻട്രി ഡിറ്റക്ഷൻ (സെയിൽസ്)
+  // ഡബിൾ എൻട്രി ഡിറ്റക്ഷൻ (സെയിൽസ്)
   const selDate = getSelectedDate();
   const isDuplicate = transactionsList.some(t => {
     if (!t) return false;
@@ -1428,7 +1428,7 @@ async function savePurchaseEntry() {
 
   if (cash <= 0 && bank <= 0 && credit <= 0) return alert("തുക നൽകുക!");
 
-  // 2. ഡബിൾ എൻട്രി ഡിറ്റക്ഷൻ (പർച്ചേസ്)
+  // ഡബിൾ എൻട്രി ഡിറ്റക്ഷൻ (പർച്ചേസ്)
   const selDate = getSelectedDate();
   const isDuplicate = transactionsList.some(t => {
     if (!t) return false;
@@ -1497,7 +1497,7 @@ async function saveUnifiedExpSalEntry() {
   let payload = {};
 
   if (emp) {
-    // 2. ഡബിൾ എൻട്രി ഡിറ്റക്ഷൻ (സാലറി)
+    // ഡബിൾ എൻട്രി ഡിറ്റക്ഷൻ (സാലറി)
     const isDuplicate = transactionsList.some(t => {
       if (!t) return false;
       const isSameDate = (cleanDate(t.date) === cleanDate(selDate));
@@ -1538,7 +1538,7 @@ async function saveUnifiedExpSalEntry() {
       populateDropdowns();
     }
 
-    // 2. ഡബിൾ എൻട്രി ഡിറ്റക്ഷൻ (ചിലവുകൾ)
+    // ഡബിൾ എൻട്രി ഡിറ്റക്ഷൻ (ചിലവുകൾ)
     const isDuplicate = transactionsList.some(t => {
       if (!t) return false;
       const isSameDate = (cleanDate(t.date) === cleanDate(selDate));
@@ -2362,8 +2362,10 @@ async function saveEditedMasterItem() {
     if (!item) return;
     const payload = { name: newName };
     if (navigator.onLine && supabaseClient) {
+      // Syntax error FIXED below: added the missing fallback ternary branch
       const { error } = item.id 
-        ? await supabaseClient.from('agents').update(payload).eq('id', item.id);
+        ? await supabaseClient.from('agents').update(payload).eq('id', item.id)
+        : await supabaseClient.from('agents').update(payload).eq('name', originalName);
       if (error) return alert("ക്ലൗഡിലേക്ക് സേവ് ചെയ്യാൻ കഴിഞ്ഞില്ല: " + error.message);
     }
     item.name = newName;
