@@ -59,25 +59,25 @@
       body { padding-bottom: 2rem !important; }
     }
 
-    /* CONTINUOUS 2-COLUMN FLOW FOR PRINT */
+/* CONTINUOUS 2-COLUMN FLOW FOR PRINT */
     .report-continuous-flow {
       column-count: 2;
-      column-gap: 12px;
+      column-gap: 14px;
     }
     .report-block {
       break-inside: auto;
-      margin-bottom: 8px;
+      margin-bottom: 10px;
     }
     tr {
       break-inside: avoid;
       page-break-inside: avoid;
     }
 
-    /* COMPACT BOLD A4 PRINT STYLES */
+    /* COMPACT BOLD A4 PRINT STYLES - OPTION A (ENHANCED READABILITY) */
     @media print {
       @page {
         size: A4 portrait;
-        margin: 4mm 6mm;
+        margin: 5mm 7mm;
       }
       header, #mobileDateNavBar, main, nav, #offlineSyncBar, #pinModal, #newVendorModal, #newCustomerModal, #newEmployeeModal, #newExpenseModal, #employeeStopModal, #expenseBillModal, #openingFundModal, #backupModal, #masterModal, #editMasterModal, #staffDepositModal, #transferModal, #editTransactionModal, #todayPurchaseModal, #todayExpenseModal, #todaySalesModal, .no-print {
         display: none !important;
@@ -113,44 +113,48 @@
       }
       .report-continuous-flow {
         column-count: 2 !important;
-        column-gap: 10px !important;
+        column-gap: 14px !important;
       }
       .report-block {
         break-inside: auto !important;
-        margin-bottom: 6px !important;
+        margin-bottom: 8px !important;
       }
       #reportPrintContainer, #statementPrintContainer {
-        font-size: 11px !important;
-        line-height: 1.25 !important;
+        font-size: 12px !important;
+        line-height: 1.35 !important;
         color: #000 !important;
       }
       #reportPrintContainer table, #statementPrintContainer table {
-        font-size: 10px !important;
+        font-size: 11.5px !important;
         width: 100% !important;
         border-collapse: collapse !important;
       }
       #reportPrintContainer th, #statementPrintContainer th {
-        font-size: 10.5px !important;
-        padding: 4px 3px !important;
+        font-size: 12px !important;
+        padding: 5px 4px !important;
         font-weight: 900 !important;
         color: #000 !important;
-        border-bottom: 1.5px solid #000 !important;
+        border-bottom: 2px solid #000 !important;
+        background-color: #f1f5f9 !important;
+        -webkit-print-color-adjust: exact;
       }
+      /* ഓരോ കസ്റ്റമർ, വെണ്ടർ, സ്റ്റാഫ് വരികൾക്ക് അടിയിലും വ്യക്തമായ അടിവര (Underline) */
       #reportPrintContainer td, #statementPrintContainer td {
-        font-size: 10px !important;
-        padding: 3px 3px !important;
+        font-size: 11.5px !important;
+        padding: 4.5px 4px !important;
         font-weight: 700 !important;
         color: #000 !important;
+        border-bottom: 1px solid #94a3b8 !important;
       }
       #reportPrintContainer tfoot td, #statementPrintContainer tfoot td {
-        font-size: 10.5px !important;
-        padding: 4px 3px !important;
+        font-size: 12px !important;
+        padding: 5px 4px !important;
         font-weight: 900 !important;
         color: #000 !important;
-        border-top: 1.5px solid #000 !important;
+        border-top: 2px solid #000 !important;
+        border-bottom: 2px solid #000 !important;
       }
     }
-  </style>
 </head>
 <body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col pb-28">
 
