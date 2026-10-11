@@ -598,27 +598,22 @@
           </select>
         </div>
         <div>
-          <label class="block font-bold text-slate-600 mb-0.5 text-[9px]">ആളെ തിരഞ്ഞെടുക്കുക:</label>
-          <div class="relative">
-            <input 
-              list="statPartyDatalist" 
-              id="statPartyInput" 
-              onclick="this.select()"
-              onfocus="this.select()"
-              oninput="this.value = this.value.toUpperCase(); generateStatement();" 
-              onchange="generateStatement()" 
-              placeholder="പേര്..." 
-              class="w-full p-1.5 pr-6 rounded-xl border bg-white font-bold text-[11px] uppercase-input outline-none focus:ring-1 focus:ring-indigo-500" 
-            />
-            <button 
-              type="button" 
-              onclick="document.getElementById('statPartyInput').value=''; document.getElementById('statPartyInput').focus(); generateStatement();" 
-              title="ക്ലിയർ ചെയ്യുക" 
-              class="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 font-black text-xs p-0.5 cursor-pointer">
-              ✕
-            </button>
-          </div>
-          <datalist id="statPartyDatalist"></datalist>
+          <label class="block font-bold text-slate-600 mb-0.5 text-[9px]">ആളെ തിരഞ്ഞെടുക്കുക (Type / Dropdown):</label>
+          <!-- 1. TYPE CHEYTHU SEARCH CHEYYAAN -->
+          <input 
+            type="text" 
+            id="statPartySearch" 
+            oninput="filterStatementParties(this.value)" 
+            onclick="this.select()" 
+            placeholder="🔍 ടൈപ്പ് ചെയ്തു തിരയാൻ..." 
+            class="w-full p-1 mb-1 rounded-xl border bg-slate-50 font-bold text-[11px] uppercase-input outline-none focus:ring-1 focus:ring-indigo-500" 
+          />
+          <!-- 2. DIRECT AAYI TAP CHEYTHU SELECT CHEYYAAN -->
+          <select 
+            id="statPartySelect" 
+            onchange="generateStatement()" 
+            class="w-full p-1.5 rounded-xl border-2 border-indigo-300 bg-white font-black text-slate-900 text-xs outline-none cursor-pointer focus:border-indigo-600 shadow-sm">
+          </select>
         </div>
         <div>
           <label class="block font-bold text-slate-600 mb-0.5 text-[9px]">മാസം:</label>
