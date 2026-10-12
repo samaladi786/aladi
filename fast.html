@@ -477,7 +477,7 @@
       try {
         const now = new Date();
         const saudiTime = new Date(now.getTime() + (now.getTimezoneOffset() + 180) * 60000);
-        if (saudiTime.getHours() < 6) saudiTime.setDate(saudiTime.getDate() - 1);
+        if (saudiTime.getHours() < 8) saudiTime.setDate(saudiTime.getDate() - 1);
         const y = saudiTime.getFullYear();
         const m = String(saudiTime.getMonth() + 1).padStart(2, '0');
         const d = String(saudiTime.getDate()).padStart(2, '0');
