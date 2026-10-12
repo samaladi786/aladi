@@ -38,24 +38,29 @@
 </head>
 <body class="bg-slate-100 text-slate-800 min-h-screen p-2 sm:p-5 text-xs flex flex-col justify-center items-center">
 
-  <!-- LOGIN SCREEN -->
+  <!-- ========================================== -->
+  <!-- 1. LOGIN SCREEN (4-DIGIT AUTO-SUBMIT)      -->
+  <!-- ========================================== -->
   <div id="loginScreen" class="w-full max-w-sm bg-white p-6 rounded-3xl shadow-2xl border border-slate-200 text-center space-y-4">
     <div class="w-14 h-14 bg-emerald-100 text-emerald-700 rounded-2xl flex items-center justify-center mx-auto shadow-inner">
       <i data-lucide="lock" class="w-7 h-7"></i>
     </div>
     <div>
       <h2 class="text-base font-black text-slate-900 uppercase">ക്യാഷ് ക്ലോസിംഗ് ലോഗിൻ</h2>
-      <p class="text-[11px] font-bold text-slate-500 mt-0.5">തുടരാൻ ഷോപ്പ് പിൻ അല്ലെങ്കിൽ മാസ്റ്റർ പിൻ നൽകുക</p>
+      <p class="text-[11px] font-bold text-slate-500 mt-0.5">4 അക്ക ഷോപ്പ് പിൻ അല്ലെങ്കിൽ മാസ്റ്റർ പിൻ നൽകുക</p>
     </div>
     <div>
       <input 
         type="password" 
         id="loginPinInput" 
-        maxlength="6" 
+        maxlength="4" 
         inputmode="numeric" 
         pattern="[0-9]*" 
         placeholder="••••" 
-        class="w-full text-center text-2xl font-black tracking-widest p-2.5 rounded-2xl border-2 border-slate-300 bg-slate-50 outline-none focus:border-emerald-600 focus:bg-white transition"
+        onclick="this.select()"
+        onfocus="this.select()"
+        oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 4); if(this.value.length === 4) { verifyLogin(); }"
+        class="w-full text-center text-3xl font-black tracking-[0.3em] p-2.5 rounded-2xl border-2 border-slate-300 bg-slate-50 outline-none focus:border-emerald-600 focus:bg-white transition cursor-pointer"
         onkeydown="if(event.key === 'Enter') verifyLogin();"
       />
     </div>
@@ -67,10 +72,12 @@
     </button>
   </div>
 
-  <!-- MAIN APP CONTAINER -->
+  <!-- ========================================== -->
+  <!-- 2. MAIN APP CONTAINER                      -->
+  <!-- ========================================== -->
   <div id="appContainer" class="w-full max-w-2xl bg-white rounded-2xl shadow-lg border border-slate-200 p-4 sm:p-6 print-border space-y-3.5 hidden">
     
-    <!-- TOP BAR (SHOP, INSTALL, DATE, LOGOUT) -->
+    <!-- TOP CONTROLS (SHOP SELECTOR, DATE & LOGOUT) -->
     <div class="no-print bg-slate-50 p-2.5 rounded-xl border border-slate-200 flex flex-wrap justify-between items-center gap-2">
       <div class="flex items-center gap-2">
         <label class="font-black text-slate-700">ഷോപ്പ്:</label>
@@ -80,13 +87,12 @@
       </div>
 
       <div class="flex items-center gap-2">
-        <!-- PWA INSTALL BUTTON -->
         <button id="pwaInstallBtn" onclick="triggerPwaInstall()" class="hidden px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-lg text-[11px] shadow flex items-center gap-1 cursor-pointer">
           <i data-lucide="download" class="w-3.5 h-3.5"></i> ആപ്പ് ഇൻസ്റ്റാൾ ചെയ്യുക
         </button>
 
         <label class="font-black text-slate-700">തീയതി:</label>
-        <input type="date" id="closingDate" onchange="saveData()" class="p-1 px-2 border border-slate-300 rounded-lg font-black bg-white outline-none" />
+        <input type="date" id="closingDate" onchange="saveData()" class="p-1 px-2 border border-slate-300 rounded-lg font-black bg-white outline-none cursor-pointer" />
         
         <button onclick="logoutApp()" title="ലോഗൗട്ട്" class="p-1 px-2 text-rose-600 hover:bg-rose-50 rounded-lg border border-rose-200 font-bold transition flex items-center gap-1 cursor-pointer">
           <i data-lucide="log-out" class="w-3.5 h-3.5"></i>
@@ -133,8 +139,7 @@
         </button>
       </div>
 
-      <div id="madaMachinesList" class="space-y-1.5">
-      </div>
+      <div id="madaMachinesList" class="space-y-1.5"></div>
 
       <div class="flex justify-between items-center pt-1.5 border-t border-blue-200 text-xs font-black text-blue-950">
         <span>ആകെ മദാ ബാങ്ക് (Total Mada):</span>
@@ -176,8 +181,7 @@
             <th class="p-1.5 text-center w-8 no-print">✕</th>
           </tr>
         </thead>
-        <tbody id="expensesTableBody" class="font-bold text-[11px] divide-y divide-slate-100">
-        </tbody>
+        <tbody id="expensesTableBody" class="font-bold text-[11px] divide-y divide-slate-100"></tbody>
         <tfoot>
           <tr class="font-black text-[11px] bg-amber-100/70 border-t">
             <td colspan="2" class="p-1.5 uppercase text-amber-950">ആകെ ചിലവുകൾ (Total Outflow):</td>
@@ -235,6 +239,25 @@
 
   <script>
     // ==========================================
+    // SAUDI BUSINESS DATE (8:00 AM CUT-OFF SYNC)
+    // ==========================================
+    function getSaudiBusinessDate() {
+      try {
+        const now = new Date();
+        const saudiTime = new Date(now.getTime() + (now.getTimezoneOffset() + 180) * 60000);
+        if (saudiTime.getHours() < 8) {
+          saudiTime.setDate(saudiTime.getDate() - 1);
+        }
+        const y = saudiTime.getFullYear();
+        const m = String(saudiTime.getMonth() + 1).padStart(2, '0');
+        const d = String(saudiTime.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+      } catch(e) {
+        return new Date().toISOString().split('T')[0];
+      }
+    }
+
+    // ==========================================
     // PWA REGISTRATION & INSTALL LOGIC
     // ==========================================
     var deferredPrompt = null;
@@ -264,7 +287,7 @@
     }
 
     // ==========================================
-    // CORE FUNCTIONS
+    // CONFIG & PIN LOGIC
     // ==========================================
     function getShopsList() {
       if (window.SHOPS_CONFIG && Array.isArray(window.SHOPS_CONFIG) && window.SHOPS_CONFIG.length > 0) return window.SHOPS_CONFIG;
@@ -287,7 +310,7 @@
     var currentShop = null;
     var userRole = 'shop';
     var closingState = {
-      date: new Date().toISOString().split('T')[0],
+      date: getSaudiBusinessDate(),
       counterCash: 0,
       madaMachines: [{ label: "മെഷീൻ 1 (Mada 1)", amount: 0 }],
       expenses: []
@@ -341,7 +364,10 @@
         appEl.classList.add("hidden");
         setTimeout(() => {
           const inp = document.getElementById("loginPinInput");
-          if (inp) inp.focus();
+          if (inp) {
+            inp.focus();
+            inp.select();
+          }
         }, 150);
       }
     }
@@ -411,18 +437,20 @@
     function loadData() {
       const shopId = currentShop ? currentShop.id : 'default';
       const saved = localStorage.getItem(`ALNASSR_${shopId}_CLOSING`);
+      const defaultDate = getSaudiBusinessDate();
+
       if (saved) {
         try { closingState = JSON.parse(saved); } catch(e) {}
       } else {
         closingState = {
-          date: new Date().toISOString().split('T')[0],
+          date: defaultDate,
           counterCash: 0,
           madaMachines: [{ label: "മെഷീൻ 1 (Mada 1)", amount: 0 }],
           expenses: []
         };
       }
 
-      document.getElementById("closingDate").value = closingState.date || new Date().toISOString().split('T')[0];
+      document.getElementById("closingDate").value = closingState.date || defaultDate;
       document.getElementById("printDateDisplay").innerText = `തീയതി: ${document.getElementById("closingDate").value}`;
       document.getElementById("counterCash").value = closingState.counterCash || "";
 
@@ -433,7 +461,7 @@
 
     function saveData() {
       const shopId = currentShop ? currentShop.id : 'default';
-      closingState.date = document.getElementById("closingDate").value;
+      closingState.date = document.getElementById("closingDate").value || getSaudiBusinessDate();
       document.getElementById("printDateDisplay").innerText = `തീയതി: ${closingState.date}`;
       closingState.counterCash = parseFloat(document.getElementById("counterCash").value) || 0;
       localStorage.setItem(`ALNASSR_${shopId}_CLOSING`, JSON.stringify(closingState));
@@ -574,7 +602,7 @@
       if (!confirm("പുതിയ ദിവസത്തെ കണക്കുകൾ തുടങ്ങാൻ ഈ ഷോപ്പിലെ വിവരങ്ങൾ ക്ലിയർ ചെയ്യണമോ?")) return;
       const shopId = currentShop ? currentShop.id : 'default';
       closingState = {
-        date: new Date().toISOString().split('T')[0],
+        date: getSaudiBusinessDate(),
         counterCash: 0,
         madaMachines: [{ label: "മെഷീൻ 1 (Mada 1)", amount: 0 }],
         expenses: []
