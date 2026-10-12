@@ -201,9 +201,9 @@
       </div>
     </div>
 
-    <!-- 4. EXPENSES WITH LIVE DUE SEARCH & AUTO-CAPITAL -->
+    <!-- 4. EXPENSES / PURCHASES ENTRY WITH DUAL INPUT FOR CREDIT VENDORS -->
     <div class="bg-amber-50/70 p-3 sm:p-3.5 rounded-2xl border-2 border-amber-300 print-box space-y-2.5">
-      <span class="font-black text-amber-950 text-xs sm:text-sm block">⚡ പെട്ടിയിൽ നിന്നുള്ള ചിലവുകൾ / പർച്ചേസ് (Expenses):</span>
+      <span class="font-black text-amber-950 text-xs sm:text-sm block">⚡ പെട്ടിയിൽ നിന്നുള്ള ചിലവുകൾ / പർച്ചേസ് (Expenses & Purchases):</span>
 
       <!-- Touch-Friendly Single Search Entry Box -->
       <div class="no-print bg-white p-3 rounded-2xl border-2 border-amber-300 shadow-sm space-y-2">
@@ -225,19 +225,39 @@
             <div id="partySuggestions" class="absolute left-0 right-0 top-full mt-1 bg-white border-2 border-slate-300 rounded-xl shadow-xl max-h-60 overflow-y-auto z-50 hidden divide-y divide-slate-100"></div>
           </div>
 
-          <!-- Amount Input -->
-          <div class="flex gap-2">
-            <input 
-              type="number" 
-              step="any" 
-              id="expAmtInput" 
-              placeholder="തുക" 
-              onclick="this.select()"
-              onfocus="this.select()"
-              oninput="updateLiveRemainingPreview()"
-              class="flex-1 sm:w-32 p-2.5 px-3 text-xs sm:text-sm font-black border-2 border-slate-200 rounded-xl outline-none focus:border-amber-500 text-right font-mono" 
-              onkeydown="if(event.key === 'Enter') addExpenseRow();"
-            />
+          <!-- Input Fields (Credit Bill + Cash Amount) -->
+          <div class="flex gap-2 flex-wrap sm:flex-nowrap items-center">
+            
+            <!-- Credit Purchase Bill Box (Shows ONLY for Credit Vendors) -->
+            <div id="creditBillContainer" class="hidden flex-1 sm:w-28">
+              <input 
+                type="number" 
+                step="any" 
+                id="expCreditBillInput" 
+                placeholder="ക്രെഡിറ്റ് ബിൽ" 
+                onclick="this.select()"
+                onfocus="this.select()"
+                oninput="updateLiveRemainingPreview()"
+                class="w-full p-2.5 px-2 text-xs sm:text-sm font-black border-2 border-blue-300 bg-blue-50/50 rounded-xl outline-none focus:border-blue-500 text-right font-mono text-blue-950" 
+                onkeydown="if(event.key === 'Enter') document.getElementById('expAmtInput').focus();"
+              />
+            </div>
+
+            <!-- Cash Paid from Drawer -->
+            <div class="flex-1 sm:w-28">
+              <input 
+                type="number" 
+                step="any" 
+                id="expAmtInput" 
+                placeholder="കൊടുത്ത ക്യാഷ്" 
+                onclick="this.select()"
+                onfocus="this.select()"
+                oninput="updateLiveRemainingPreview()"
+                class="w-full p-2.5 px-2 text-xs sm:text-sm font-black border-2 border-slate-200 rounded-xl outline-none focus:border-amber-500 text-right font-mono" 
+                onkeydown="if(event.key === 'Enter') addExpenseRow();"
+              />
+            </div>
+
             <button type="button" onclick="addExpenseRow()" class="bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white font-black text-xs sm:text-sm px-4 py-2.5 rounded-xl shadow cursor-pointer whitespace-nowrap">
               + ചേർക്കുക
             </button>
@@ -257,15 +277,16 @@
           <tr class="bg-amber-100 text-amber-950 font-black text-[11px] border-b">
             <th class="p-2 w-8 text-center">#</th>
             <th class="p-2">ഇനം / വിവരണം</th>
-            <th class="p-2 text-right w-28">തുക</th>
+            <th class="p-2 text-right w-24">ക്രെഡിറ്റ് ബിൽ</th>
+            <th class="p-2 text-right w-24">കൊടുത്ത ക്യാഷ്</th>
             <th class="p-2 text-right w-28">ബാക്കി കുടിശ്ശിക</th>
-            <th class="p-2 text-center w-10 no-print">✕</th>
+            <th class="p-2 text-center w-8 no-print">✕</th>
           </tr>
         </thead>
         <tbody id="expensesTableBody" class="font-bold text-[11px] divide-y divide-slate-100"></tbody>
         <tfoot>
           <tr class="font-black text-[11px] bg-amber-100/70 border-t">
-            <td colspan="2" class="p-2 uppercase text-amber-950">ആകെ ചിലവുകൾ (Total Outflow):</td>
+            <td colspan="3" class="p-2 uppercase text-amber-950">പെട്ടിയിൽ നിന്നുള്ള ആകെ ക്യാഷ് ചിലവ് (Total Cash Outflow):</td>
             <td id="displayTotalExpenses" class="p-2 text-right text-amber-900 font-mono text-xs font-black">0.00</td>
             <td colspan="2" class="no-print"></td>
           </tr>
@@ -529,7 +550,7 @@
         // 1. Vendors (Cash vs Credit)
         vendors.forEach(v => {
           const vName = (v.name || '').trim().toUpperCase();
-          const vType = (v.type || 'credit').toLowerCase(); // 'credit' or 'cash'
+          const vType = (v.type || 'credit').toLowerCase();
           let due = parseFloat(v.opening_balance) || 0;
 
           transactions.forEach(t => {
@@ -578,7 +599,6 @@
             }
           });
 
-          // Net Balance: (Opening Balance + Accrued Salary) - Total Paid
           const netBalance = (openingBal + accruedSalary) - paid;
 
           masterPartyCache.push({
@@ -613,7 +633,9 @@
       }
     }
 
-    // SINGLE SEARCHABLE DROPDOWN LOGIC
+    // =========================================================================
+    // SEARCH DROPDOWN (ONLY 2 OPTIONS FOR NEW NAMES)
+    // =========================================================================
     function showPartyDropdown() {
       filterPartyDropdown(document.getElementById("expPartyInput").value);
     }
@@ -639,11 +661,11 @@
         popup.appendChild(item);
       });
 
-      // 2. Options to add new if query is not in master list
+      // 2. Options for New Names: ONLY Cash Vendor & Expense! (NO Credit Vendor)
       if (q.length > 0) {
         const hasExactMatch = masterPartyCache.some(p => p.name === q);
         if (!hasExactMatch) {
-          // Option A: Add as Direct Cash Vendor (Purchases: Roti, Milk, Veg, etc.)
+          // Option A: Direct Cash Vendor (Cash Purchases)
           const addCashVendOption = document.createElement("div");
           addCashVendOption.className = "p-2.5 px-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-950 font-black cursor-pointer flex justify-between items-center text-xs border-t border-emerald-200";
           addCashVendOption.innerHTML = `
@@ -653,17 +675,7 @@
           addCashVendOption.onmousedown = () => selectParty({ name: q, type: 'vendor', vendorType: 'cash', label: `[VENDOR] ${q} (CASH)`, due: 0, isNewVendor: true });
           popup.appendChild(addCashVendOption);
 
-          // Option B: Add as Credit Vendor
-          const addCreditVendOption = document.createElement("div");
-          addCreditVendOption.className = "p-2.5 px-3 bg-blue-50 hover:bg-blue-100 text-blue-950 font-black cursor-pointer flex justify-between items-center text-xs border-t border-blue-200";
-          addCreditVendOption.innerHTML = `
-            <span>📋 "${q}" - [CREDIT VENDOR] കുടിശ്ശിക വെണ്ടർ</span>
-            <span class="text-[10px] bg-blue-200 text-blue-900 px-2 py-0.5 rounded">ക്രെഡിറ്റ്</span>
-          `;
-          addCreditVendOption.onmousedown = () => selectParty({ name: q, type: 'vendor', vendorType: 'credit', label: `[VENDOR] ${q} (CREDIT)`, due: 0, isNewVendor: true });
-          popup.appendChild(addCreditVendOption);
-
-          // Option C: Add as General Expense (Auto added to expenses_master)
+          // Option B: General Expense
           const addExpOption = document.createElement("div");
           addExpOption.className = "p-2.5 px-3 bg-amber-50 hover:bg-amber-100 text-amber-950 font-black cursor-pointer flex justify-between items-center text-xs border-t border-amber-200";
           addExpOption.innerHTML = `
@@ -689,12 +701,27 @@
       inp.value = party.name;
       document.getElementById("partySuggestions").classList.add("hidden");
 
+      const creditContainer = document.getElementById("creditBillContainer");
+      const amtInput = document.getElementById("expAmtInput");
+      const creditBillInput = document.getElementById("expCreditBillInput");
+
+      // SHOW DUAL INPUT FOR EXISTING CREDIT VENDORS
+      if (party.type === 'vendor' && party.vendorType === 'credit') {
+        creditContainer.classList.remove("hidden");
+        amtInput.placeholder = "കൊടുത്ത ക്യാഷ്";
+        creditBillInput.value = "";
+        setTimeout(() => creditBillInput.focus(), 50);
+      } else {
+        creditContainer.classList.add("hidden");
+        creditBillInput.value = "";
+        amtInput.placeholder = (party.type === 'vendor') ? "പർച്ചേസ് തുക" : "തുക";
+        setTimeout(() => amtInput.focus(), 50);
+      }
+
       const badge = document.getElementById("liveBalanceBadge");
       badge.classList.remove("hidden");
       document.getElementById("lblCurrentDue").innerText = (party.due || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 });
       updateLiveRemainingPreview();
-
-      document.getElementById("expAmtInput").focus();
     }
 
     function updateLiveRemainingPreview() {
@@ -706,8 +733,17 @@
       badge.classList.remove("hidden");
       document.getElementById("lblCurrentDue").innerText = (selectedPartyObject.due || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 });
 
-      const amt = parseFloat(document.getElementById("expAmtInput").value) || 0;
-      const rem = (selectedPartyObject.due || 0) - amt;
+      const creditBill = parseFloat(document.getElementById("expCreditBillInput").value) || 0;
+      const cashPaid = parseFloat(document.getElementById("expAmtInput").value) || 0;
+
+      // For Credit Vendor: Due = Old Due + Credit Bill - Cash Paid
+      let rem = (selectedPartyObject.due || 0);
+      if (selectedPartyObject.type === 'vendor' && selectedPartyObject.vendorType === 'credit') {
+        rem = rem + creditBill - cashPaid;
+      } else {
+        rem = rem - cashPaid;
+      }
+
       document.getElementById("lblRemainingDue").innerText = rem.toLocaleString('en-IN', { minimumFractionDigits: 2 });
     }
 
@@ -853,14 +889,16 @@
       const tbody = document.getElementById("expensesTableBody");
       tbody.innerHTML = "";
       if (closingState.expenses.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="5" class="p-3 text-center text-slate-400 font-bold">ചിലവുകൾ ഇല്ല</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" class="p-3 text-center text-slate-400 font-bold">ചിലവുകൾ ഇല്ല</td></tr>`;
         return;
       }
       closingState.expenses.forEach((item, idx) => {
         const tr = document.createElement("tr");
+        const creditBillDisp = item.credit_bill > 0 ? item.credit_bill.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '-';
         tr.innerHTML = `
           <td class="p-2 text-center text-slate-500">${idx + 1}</td>
           <td class="p-2 font-black text-slate-900">${item.desc}</td>
+          <td class="p-2 text-right font-mono text-blue-900 font-bold">${creditBillDisp}</td>
           <td class="p-2 text-right font-black text-amber-950 font-mono">${item.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
           <td class="p-2 text-right font-mono text-slate-600 font-bold">${item.remaining_due !== undefined ? item.remaining_due.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '-'}</td>
           <td class="p-2 text-center no-print"><button onclick="removeExpenseRow(${idx})" title="ഈ വരി ഒഴിവാക്കുക" class="text-rose-500 hover:text-rose-700 font-black cursor-pointer p-1">✕</button></td>
@@ -872,21 +910,32 @@
     function addExpenseRow() {
       const partyInp = document.getElementById("expPartyInput");
       const amtInp = document.getElementById("expAmtInput");
-      const desc = partyInp.value.trim().toUpperCase();
-      const amt = parseFloat(amtInp.value) || 0;
+      const creditBillInp = document.getElementById("expCreditBillInput");
 
-      if (!desc || amt <= 0) return alert("വിവരണം തുകയും നൽകുക!");
+      const desc = partyInp.value.trim().toUpperCase();
+      const cashPaid = parseFloat(amtInp.value) || 0;
+      const creditBill = parseFloat(creditBillInp.value) || 0;
+
+      if (!desc) return alert("വിവരണം നൽകുക!");
+      if (cashPaid <= 0 && creditBill <= 0) return alert("തുക നൽകുക!");
 
       const type = selectedPartyObject ? selectedPartyObject.type : 'regular_expense';
       const vendorType = selectedPartyObject ? (selectedPartyObject.vendorType || 'credit') : 'credit';
       const due = selectedPartyObject ? (selectedPartyObject.due || 0) : 0;
       const isNewV = selectedPartyObject ? !!selectedPartyObject.isNewVendor : false;
       const isNewE = selectedPartyObject ? !!selectedPartyObject.isNewExpense : false;
-      const rem = due - amt;
+
+      let rem = due;
+      if (type === 'vendor' && vendorType === 'credit') {
+        rem = rem + creditBill - cashPaid;
+      } else {
+        rem = rem - cashPaid;
+      }
 
       closingState.expenses.push({
         desc: desc,
-        amount: amt,
+        amount: cashPaid,          // Cash outflow
+        credit_bill: creditBill,   // Credit purchase bill
         type: type,
         vendorType: vendorType,
         initial_due: due,
@@ -897,6 +946,9 @@
 
       partyInp.value = "";
       amtInp.value = "";
+      creditBillInp.value = "";
+      document.getElementById("creditBillContainer").classList.add("hidden");
+      amtInp.placeholder = "കൊടുത്ത ക്യാഷ്";
       selectedPartyObject = null;
       document.getElementById("liveBalanceBadge").classList.add("hidden");
       partyInp.focus();
@@ -921,10 +973,11 @@
       let totalMada = 0;
       closingState.madaMachines.forEach(m => totalMada += (m.amount || 0));
 
+      // Strictly sum the cash paid from drawer
       let totalExpenses = 0;
       closingState.expenses.forEach(e => totalExpenses += (e.amount || 0));
 
-      // Real Cash Sale = Counter Cash + Manager Out - Manager In + Expenses
+      // Real Cash Sale = Counter Cash + Manager Out - Manager In + Total Cash Outflow
       const totalCashSale = Math.max(0, (counterCash + managerOut - managerIn + totalExpenses));
       const grandTotal = totalCashSale + totalMada;
 
@@ -936,9 +989,9 @@
       document.getElementById("finalGrandSale").innerText = grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 });
     }
 
-    // ==========================================
-    // LINKED DELETE WITH 2-DAY LOCK & MASTER PIN
-    // ==========================================
+    // =========================================================================
+    // 100% COMPLETE LINKED DELETE WITH 2-DAY LOCK & MASTER PIN
+    // =========================================================================
     async function deleteClosingRecord() {
       const selectedDate = document.getElementById("closingDate").value;
       const todayStr = getSaudiBusinessDate();
@@ -971,25 +1024,49 @@
             .eq('date', selectedDate)
             .eq('closing_ref', `CLOSING_${selectedDate}`);
 
-          // Also clean legacy batch transactions without ref
+          // Clean legacy batch transactions
           await supabaseClient
             .from('transactions')
             .delete()
             .eq('date', selectedDate)
             .in('party_name', ['DAILY CASH SALE (CLOSING)', 'MADA CARD SALE (CLOSING)']);
 
-          // 2. Delete from daily_closings
+          // 2. Delete from daily_closings table
           await supabaseClient
             .from('daily_closings')
             .delete()
             .eq('date', selectedDate);
         }
 
+        // 3. Clear LocalStorage for this date completely
         const shopId = currentShop ? currentShop.id : 'default';
         localStorage.removeItem(`ALNASSR_${shopId}_CLOSING_${selectedDate}`);
 
-        alert("🗑️ ആ ദിവസത്തെ ക്ലോസിംഗും മെയിൻ ലെഡ്ജറിലെ ഇടപാടുകളും വിജയകരമായി നീക്കം ചെയ്തു!");
-        await loadDateData();
+        // 4. Reset in-memory state
+        closingState = {
+          date: selectedDate,
+          counterCash: 0,
+          managerCashOut: 0,
+          managerCashIn: 0,
+          madaMachines: [{ label: "മെഷീൻ 1 (MADA 1)", amount: 0 }],
+          expenses: []
+        };
+
+        // 5. Reset All Form Inputs
+        document.getElementById("counterCash").value = "";
+        document.getElementById("managerCashOut").value = "";
+        document.getElementById("managerCashIn").value = "";
+        document.getElementById("expPartyInput").value = "";
+        document.getElementById("expAmtInput").value = "";
+        document.getElementById("expCreditBillInput").value = "";
+        document.getElementById("creditBillContainer").classList.add("hidden");
+        document.getElementById("btnDeleteRecord").classList.add("hidden");
+        selectedPartyObject = null;
+
+        populateUIFromState();
+        fetchMasterPartiesWithBalances();
+
+        alert("🗑️ ആ ദിവസത്തെ ക്ലോസിംഗും മെയിൻ ലെഡ്ജറിലെ മുഴുവൻ ഇടപാടുകളും വിജയകരമായി നീക്കം ചെയ്തു!");
 
       } catch (err) {
         alert("ഡിലീറ്റ് പിശക്: " + err.message);
@@ -1026,7 +1103,7 @@
       }
 
       try {
-        // 1. A. Auto-create new vendors with accurate type ('cash' or 'credit')
+        // 1. Auto-create new cash vendors & expenses
         for (const exp of closingState.expenses) {
           if (exp.type === 'vendor' && exp.isNewVendor) {
             try {
@@ -1034,7 +1111,7 @@
               if (!vCheck) {
                 await supabaseClient.from('vendors').insert([{
                   name: exp.desc,
-                  type: exp.vendorType || 'cash',
+                  type: 'cash',
                   opening_balance: 0
                 }]);
               }
@@ -1042,7 +1119,6 @@
               console.warn("Auto-create vendor note:", vErr);
             }
           }
-          // 1. B. Auto-create new expenses in expenses_master table
           if (exp.type === 'regular_expense' && exp.isNewExpense) {
             try {
               const { data: eCheck } = await supabaseClient.from('expenses_master').select('id').eq('name', exp.desc).maybeSingle();
@@ -1124,24 +1200,38 @@
         // C. Individual Outflow Transactions
         closingState.expenses.forEach(exp => {
           if (exp.type === 'vendor') {
-            if (exp.vendorType === 'cash') {
-              // Direct Cash Purchase: Increases Purchases total, but net ledger balance is 0!
+            if (exp.vendorType === 'credit') {
+              // Credit Purchase Bill (Credit Amount increases vendor due, no cash impact)
+              if (exp.credit_bill > 0) {
+                batchTx.push({
+                  date: selectedDate,
+                  type: 'purchase',
+                  party_name: exp.desc,
+                  credit_amount: Math.abs(exp.credit_bill),
+                  cash_amount: 0,
+                  bank_amount: 0,
+                  closing_ref: closingRefTag
+                });
+              }
+              // Cash Paid to Credit Vendor (Reduces vendor due, cash outflow)
+              if (exp.amount > 0) {
+                batchTx.push({
+                  date: selectedDate,
+                  type: 'purchase',
+                  party_name: exp.desc,
+                  credit_amount: 0,
+                  cash_amount: -Math.abs(exp.amount),
+                  bank_amount: 0,
+                  closing_ref: closingRefTag
+                });
+              }
+            } else {
+              // Direct Cash Purchase (Roti, Veg, etc.)
               batchTx.push({
                 date: selectedDate,
                 type: 'purchase',
                 party_name: exp.desc,
                 credit_amount: Math.abs(exp.amount),
-                cash_amount: -Math.abs(exp.amount),
-                bank_amount: 0,
-                closing_ref: closingRefTag
-              });
-            } else {
-              // Credit Vendor Due Payment: Reduces vendor pending balance!
-              batchTx.push({
-                date: selectedDate,
-                type: 'purchase',
-                party_name: exp.desc,
-                credit_amount: 0,
                 cash_amount: -Math.abs(exp.amount),
                 bank_amount: 0,
                 closing_ref: closingRefTag
@@ -1194,6 +1284,8 @@
         document.getElementById("managerCashIn").value = "";
         document.getElementById("expPartyInput").value = "";
         document.getElementById("expAmtInput").value = "";
+        document.getElementById("expCreditBillInput").value = "";
+        document.getElementById("creditBillContainer").classList.add("hidden");
         selectedPartyObject = null;
         document.getElementById("liveBalanceBadge").classList.add("hidden");
 
@@ -1227,7 +1319,8 @@
       closingState.expenses.forEach(e => {
         totalExpenses += e.amount;
         let remStr = e.remaining_due !== undefined ? ` (ബാക്കി: ${e.remaining_due.toLocaleString('en-IN', { minimumFractionDigits: 2 })})` : '';
-        expText += `  ▫️ ${e.desc}: ${e.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}${remStr}\n`;
+        let crBillStr = e.credit_bill > 0 ? ` [ബിൽ: ${e.credit_bill.toLocaleString('en-IN', { minimumFractionDigits: 2 })}]` : '';
+        expText += `  ▫️ ${e.desc}${crBillStr}: ${e.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}${remStr}\n`;
       });
 
       const totalCashSale = Math.max(0, (counterCash + managerOut - managerIn + totalExpenses));
