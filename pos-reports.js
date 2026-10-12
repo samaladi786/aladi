@@ -5,8 +5,9 @@
 var currentReportMode = 'daily';
 var currentReportDataForWA = {};
 var currentStatementDataForWA = null;
+var rawStatementPartyList = [];
 
-// Customer-il ninnu Agent-inte peru ethoru field aayalum (agent_name, agent, agent_id) krithyamayi edukkunnu
+// കസ്റ്റമറിൽ നിന്ന് ഏജന്റിന്റെ പേര് കണ്ടെത്തുന്നു
 function getCustomerAgentName(cust) {
   if (!cust) return '';
   if (cust.agent_name && String(cust.agent_name).trim()) return String(cust.agent_name).trim();
@@ -90,7 +91,6 @@ function switchReportMode(mode) {
     if (statementPrintContainer) statementPrintContainer.classList.remove("hidden");
     if (reportPrintContainer) reportPrintContainer.classList.add("hidden");
     populateStatementPartyDatalist();
-    generateStatement();
   }
 }
 
@@ -136,11 +136,13 @@ function renderReportData(mode) {
   if (repDateBadge) repDateBadge.innerText = dateBadgeText;
 
   let allTx = Array.isArray(transactionsList) ? [...transactionsList] : [];
-  const offlineQueue = getOfflineQueue();
-  offlineQueue.forEach(item => { 
-    const record = item.payload ? item.payload : item;
-    allTx.unshift(record); 
-  });
+  if (typeof getOfflineQueue === 'function') {
+    const offlineQueue = getOfflineQueue();
+    offlineQueue.forEach(item => { 
+      const record = item.payload ? item.payload : item;
+      allTx.unshift(record); 
+    });
+  }
 
   let totSale = 0, totPur = 0, totExp = 0, totSal = 0;
   let cashSalesMap = {};
@@ -288,13 +290,14 @@ function renderReportData(mode) {
 
   let totalEmpPending = 0;
   (employeesList || []).forEach(emp => {
-    totalEmpPending += calculateEmployeePendingBalance(emp, targetDate);
+    if (typeof calculateEmployeePendingBalance === 'function') {
+      totalEmpPending += calculateEmployeePendingBalance(emp, targetDate);
+    }
   });
 
   let totalDayOpening = dayOpeningCash + dayOpeningBank;
   let totalTargetClosing = targetClosingCash + targetClosingBank;
 
-  // 15% VAT CALCULATIONS
   const vatOutput = totSale > 0 ? (totSale - (totSale / 1.15)) : 0;
   const vatInput = totPur > 0 ? (totPur - (totPur / 1.15)) : 0;
   const vatNet = vatOutput - vatInput;
@@ -316,7 +319,7 @@ function renderReportData(mode) {
   setVal("salesGrandBadge", `ആകെ: ${totSale.toLocaleString('en-IN')}`);
   setVal("purchaseGrandBadge", `ആകെ: ${totPur.toLocaleString('en-IN')}`);
 
-  // REPORT TABLES
+  // Tables
   const cashSalesArr = Object.values(cashSalesMap);
   let rCSCash = 0, rCSBank = 0, rCSTotal = 0;
   let cashSalesHtml = `<table class="w-full text-center border-collapse"><thead><tr class="bg-emerald-100 text-slate-900 font-black border-b"><th class="p-1 text-left">പേര്</th><th class="p-1">ക്യാഷ്</th><th class="p-1">ബാങ്ക്</th><th class="p-1 text-right">ആകെ</th></tr></thead><tbody class="divide-y divide-slate-100 font-bold">`;
@@ -422,10 +425,8 @@ function renderReportData(mode) {
 }
 
 // ========================================================
-// 3. STATEMENTS ENGINE (SELECT DROPDOWN POPULATION)
+// 3. STATEMENTS ENGINE (SEARCH & DROPDOWN WITH DATE GROUPING)
 // ========================================================
-var rawStatementPartyList = [];
-
 function populateStatementPartyDatalist() {
   const type = document.getElementById("statPartyType").value;
   const searchInp = document.getElementById("statPartySearch");
@@ -518,11 +519,13 @@ function generateStatement() {
   const toDate = `${monthVal}-31`;
 
   let allTx = Array.isArray(transactionsList) ? [...transactionsList] : [];
-  const offlineQueue = getOfflineQueue();
-  offlineQueue.forEach(item => { 
-    const record = item.payload ? item.payload : item;
-    allTx.unshift(record); 
-  });
+  if (typeof getOfflineQueue === 'function') {
+    const offlineQueue = getOfflineQueue();
+    offlineQueue.forEach(item => { 
+      const record = item.payload ? item.payload : item;
+      allTx.unshift(record); 
+    });
+  }
   allTx.sort((a, b) => (cleanDate(a.date) || '').localeCompare(cleanDate(b.date) || ''));
 
   let partyName = partyVal;
@@ -545,43 +548,50 @@ function generateStatement() {
   let singleAgentCustomersSummary = [];
   let utilitiesConsolidatedSummary = [];
 
-  // 1. CUSTOMERS STATEMENT
+  // 1. CUSTOMERS STATEMENT (DATE-WISE MERGED)
   if (type === 'customer' && !isAllCustomersMode) {
     const custClean = cleanPartyName(partyVal);
-    const cust = customersList.find(c => c && cleanPartyName(c.name) === custClean);
+    const cust = (customersList || []).find(c => c && cleanPartyName(c.name) === custClean);
     partyName = cust ? cust.name.toUpperCase() : partyVal;
     openingBal = parseFloat(cust?.opening_balance) || 0;
+
+    let dailyMap = {};
 
     allTx.forEach(t => {
       let tDate = cleanDate(t.date);
       if (t && cleanPartyName(t.party_name) === custClean && t.type === 'sale') {
+        const debit = parseFloat(t.credit_amount) || 0;
+        const credit = (parseFloat(t.cash_amount) || 0) + (parseFloat(t.bank_amount) || 0);
+
         if (tDate < fromDate) {
-          openingBal += (parseFloat(t.credit_amount) || 0) - (parseFloat(t.cash_amount) || 0) - (parseFloat(t.bank_amount) || 0);
+          openingBal += (debit - credit);
+        } else if (tDate >= fromDate && tDate <= toDate) {
+          totalSalesOrBills += debit;
+          totalPaidOrCollected += credit;
+
+          if (!dailyMap[tDate]) {
+            dailyMap[tDate] = { date: tDate, paid: 0, bill: 0, types: [] };
+          }
+          dailyMap[tDate].paid += credit;
+          dailyMap[tDate].bill += debit;
+          if (debit > 0 && !dailyMap[tDate].types.includes("Bill")) dailyMap[tDate].types.push("Bill");
+          if (credit > 0 && !dailyMap[tDate].types.includes("Collection")) dailyMap[tDate].types.push("Collection");
         }
       }
     });
 
     runningBal = openingBal;
-    allTx.forEach(t => {
-      let tDate = cleanDate(t.date);
-      if (t && cleanPartyName(t.party_name) === custClean && t.type === 'sale') {
-        if (tDate >= fromDate && tDate <= toDate) {
-          const debit = parseFloat(t.credit_amount) || 0;
-          const credit = (parseFloat(t.cash_amount) || 0) + (parseFloat(t.bank_amount) || 0);
-          totalSalesOrBills += debit;
-          totalPaidOrCollected += credit;
-          runningBal += debit - credit;
-
-          statementRows.push({
-            date: tDate,
-            desc: debit > 0 ? 'Credit Sale Bill' : 'Collection Receipt',
-            cash: parseFloat(t.cash_amount) || 0,
-            bank: parseFloat(t.bank_amount) || 0,
-            bill: debit,
-            bal: runningBal
-          });
-        }
-      }
+    Object.keys(dailyMap).sort().forEach(dt => {
+      const item = dailyMap[dt];
+      runningBal += (item.bill - item.paid);
+      statementRows.push({
+        date: dt,
+        desc: item.types.join(" & ") || "Sale Transaction",
+        cash: item.paid,
+        bank: 0,
+        bill: item.bill,
+        bal: runningBal
+      });
     });
   } else if (isAllCustomersMode) {
     partyName = `TOTAL CREDIT CUSTOMERS MONTHLY STATEMENT`;
@@ -606,8 +616,6 @@ function generateStatement() {
 
       const periodPaid = periodCash + periodBank;
       const custClosingBal = custOpeningBal + periodCredit - periodPaid;
-      
-      // 10 riyal-il thaazheyullava ozhivakkunnu
       if (custClosingBal <= 10) return;
 
       totalCustOpening += custOpeningBal; totalCustSales += periodCredit; totalCustPaid += periodPaid; totalCustClosing += custClosingBal;
@@ -618,36 +626,55 @@ function generateStatement() {
     openingBal = totalCustOpening; totalSalesOrBills = totalCustSales; totalPaidOrCollected = totalCustPaid; runningBal = totalCustClosing;
   }
 
-  // 2. VENDORS STATEMENT
+  // 2. VENDORS STATEMENT (DATE-WISE MERGED)
   else if (type === 'vendor' && !isAllVendorsMode) {
     const vendClean = cleanPartyName(partyVal);
-    const vend = vendorsList.find(v => v && cleanPartyName(v.name) === vendClean);
+    const vend = (vendorsList || []).find(v => v && cleanPartyName(v.name) === vendClean);
     partyName = vend ? vend.name.toUpperCase() : partyVal;
     openingBal = parseFloat(vend?.opening_balance) || 0;
+
+    let dailyMap = {};
 
     allTx.forEach(t => {
       let tDate = cleanDate(t.date);
       if (t && cleanPartyName(t.party_name) === vendClean && t.type === 'purchase') {
-        if (tDate < fromDate) openingBal += (parseFloat(t.credit_amount) || 0) - Math.abs(parseFloat(t.cash_amount) || 0) - Math.abs(parseFloat(t.bank_amount) || 0);
+        const debit = parseFloat(t.credit_amount) || 0;
+        const paid = Math.abs(parseFloat(t.cash_amount) || 0) + Math.abs(parseFloat(t.bank_amount) || 0);
+
+        if (tDate < fromDate) {
+          openingBal += (debit - paid);
+        } else if (tDate >= fromDate && tDate <= toDate) {
+          totalSalesOrBills += debit;
+          totalPaidOrCollected += paid;
+
+          if (!dailyMap[tDate]) {
+            dailyMap[tDate] = { date: tDate, paid: 0, bill: 0, types: [] };
+          }
+          dailyMap[tDate].paid += paid;
+          dailyMap[tDate].bill += debit;
+          if (debit > 0 && !dailyMap[tDate].types.includes("Purchase")) dailyMap[tDate].types.push("Purchase");
+          if (paid > 0 && !dailyMap[tDate].types.includes("Payment")) dailyMap[tDate].types.push("Payment");
+        }
       }
     });
 
     runningBal = openingBal;
-    allTx.forEach(t => {
-      let tDate = cleanDate(t.date);
-      if (t && cleanPartyName(t.party_name) === vendClean && t.type === 'purchase') {
-        if (tDate >= fromDate && tDate <= toDate) {
-          const debit = parseFloat(t.credit_amount) || 0;
-          const paid = Math.abs(parseFloat(t.cash_amount) || 0) + Math.abs(parseFloat(t.bank_amount) || 0);
-          totalSalesOrBills += debit; totalPaidOrCollected += paid; runningBal += debit - paid;
-          statementRows.push({ date: tDate, desc: debit > 0 ? 'Credit Purchase' : 'Payment Disbursed', cash: Math.abs(parseFloat(t.cash_amount) || 0), bank: Math.abs(parseFloat(t.bank_amount) || 0), bill: debit, bal: runningBal });
-        }
-      }
+    Object.keys(dailyMap).sort().forEach(dt => {
+      const item = dailyMap[dt];
+      runningBal += (item.bill - item.paid);
+      statementRows.push({
+        date: dt,
+        desc: item.types.join(" & ") || "Purchase Transaction",
+        cash: item.paid,
+        bank: 0,
+        bill: item.bill,
+        bal: runningBal
+      });
     });
   } else if (isAllVendorsMode) {
     partyName = `TOTAL VENDORS MONTHLY STATEMENT`;
     let totalVendOpening = 0, totalVendPurchases = 0, totalVendPaid = 0, totalVendClosing = 0;
-    const creditVendors = vendorsList.filter(v => v && (v.type === 'credit' || !v.type));
+    const creditVendors = (vendorsList || []).filter(v => v && (v.type === 'credit' || !v.type));
 
     creditVendors.forEach(vend => {
       let vendOpeningBal = parseFloat(vend.opening_balance) || 0;
@@ -667,7 +694,6 @@ function generateStatement() {
 
       const periodPaid = periodCash + periodBank;
       const vendClosingBal = vendOpeningBal + periodCredit - periodPaid;
-      
       if (vendClosingBal <= 10) return;
 
       totalVendOpening += vendOpeningBal; totalVendPurchases += periodCredit; totalVendPaid += periodPaid; totalVendClosing += vendClosingBal;
@@ -770,7 +796,6 @@ function generateStatement() {
 
           const cPaid = cCash + cBank;
           const cBal = cOpening + cCredit - cPaid;
-
           if (cBal <= 10) return;
 
           totalAgOpening += cOpening;
@@ -802,7 +827,6 @@ function generateStatement() {
       (employeesList || []).forEach(emp => {
         if (!emp) return;
         const pendingBal = calculateEmployeePendingBalance(emp, toDate);
-
         if (pendingBal <= 10) return;
 
         let staffPaid = 0;
@@ -829,13 +853,10 @@ function generateStatement() {
       });
 
       employeesConsolidatedSummary.sort((a, b) => b.closing - a.closing);
-      openingBal = 0;
-      totalSalesOrBills = totalEmpSalary;
-      totalPaidOrCollected = totalEmpPaid;
-      runningBal = totalEmpClosing;
+      openingBal = 0; totalSalesOrBills = totalEmpSalary; totalPaidOrCollected = totalEmpPaid; runningBal = totalEmpClosing;
     } else {
       const cleanEmpName = cleanPartyName(partyVal);
-      const emp = employeesList.find(e => e && cleanPartyName(e.name) === cleanEmpName);
+      const emp = (employeesList || []).find(e => e && cleanPartyName(e.name) === cleanEmpName);
       partyName = emp ? emp.name.toUpperCase() : partyVal;
 
       if (emp) {
@@ -919,25 +940,12 @@ function generateStatement() {
         const exClosingBal = exOpeningBal + periodBills - periodPaid;
         if (exClosingBal <= 10) return;
 
-        totalExpOpening += exOpeningBal;
-        totalExpBills += periodBills;
-        totalExpPaid += periodPaid;
-        totalExpClosing += exClosingBal;
-
-        utilitiesConsolidatedSummary.push({
-          name: ex.name,
-          opening: exOpeningBal,
-          bills: periodBills,
-          paid: periodPaid,
-          closing: exClosingBal
-        });
+        totalExpOpening += exOpeningBal; totalExpBills += periodBills; totalExpPaid += periodPaid; totalExpClosing += exClosingBal;
+        utilitiesConsolidatedSummary.push({ name: ex.name, opening: exOpeningBal, bills: periodBills, paid: periodPaid, closing: exClosingBal });
       });
 
       utilitiesConsolidatedSummary.sort((a, b) => b.closing - a.closing);
-      openingBal = totalExpOpening;
-      totalSalesOrBills = totalExpBills;
-      totalPaidOrCollected = totalExpPaid;
-      runningBal = totalExpClosing;
+      openingBal = totalExpOpening; totalSalesOrBills = totalExpBills; totalPaidOrCollected = totalExpPaid; runningBal = totalExpClosing;
     } else {
       const expClean = cleanPartyName(partyVal);
       const ex = expensesMasterList.find(e => cleanPartyName(e.name) === expClean);
@@ -982,7 +990,7 @@ function generateStatement() {
     }
   }
 
-  // UI ELEMENTS UPDATE
+  // UI UPDATE
   const statHead = document.getElementById("statHeaderTitle");
   const statPeriod = document.getElementById("statPeriodLabel");
   const statOpen = document.getElementById("statOpeningBalText");
@@ -999,12 +1007,10 @@ function generateStatement() {
 
   let tableHtml = "";
 
-  // TABLES RENDERING WITH EMPTY FALLBACK ROW
   if (isAllCustomersMode) {
     tableHtml = `<table class="w-full border-collapse bg-white rounded-xl overflow-hidden shadow-sm table-fixed"><thead><tr class="bg-emerald-900 text-white font-black text-center border-b"><th class="p-1 w-6">#</th><th class="p-1 w-2/6 text-left">Customer</th><th class="p-1 w-1/6">Opening</th><th class="p-1 w-1/6">Sales</th><th class="p-1 w-1/6">Paid</th><th class="p-1 w-1/6 bg-emerald-950">Due (>10)</th></tr></thead><tbody class="divide-y divide-slate-100 font-bold">`;
-    if (customersConsolidatedSummary.length === 0) {
-      tableHtml += `<tr><td colspan="6" class="p-4 text-center text-slate-400 font-bold">10 റിയാലിൽ കൂടുതൽ കുടിശ്ശികയുള്ള കസ്റ്റമർമാർ ഇല്ല</td></tr>`;
-    } else {
+    if (customersConsolidatedSummary.length === 0) tableHtml += `<tr><td colspan="6" class="p-4 text-center text-slate-400 font-bold">10 റിയാലിൽ കൂടുതൽ കുടിശ്ശികയുള്ള കസ്റ്റമർമാർ ഇല്ല</td></tr>`;
+    else {
       customersConsolidatedSummary.forEach((r, idx) => {
         tableHtml += `<tr class="text-center hover:bg-slate-50"><td class="p-1">${idx + 1}</td><td class="p-1 text-left truncate">${formatShortName(r.name)}</td><td class="p-1">${r.opening.toLocaleString('en-IN')}</td><td class="p-1 text-amber-700">${r.sales.toLocaleString('en-IN')}</td><td class="p-1 text-emerald-700">${r.paid.toLocaleString('en-IN')}</td><td class="p-1 font-black text-emerald-900">${r.closing.toLocaleString('en-IN')}</td></tr>`;
       });
@@ -1012,9 +1018,8 @@ function generateStatement() {
     tableHtml += `</tbody></table>`;
   } else if (isAllVendorsMode) {
     tableHtml = `<table class="w-full border-collapse bg-white rounded-xl overflow-hidden shadow-sm table-fixed"><thead><tr class="bg-blue-900 text-white font-black text-center border-b"><th class="p-1 w-6">#</th><th class="p-1 w-2/6 text-left">Vendor</th><th class="p-1 w-1/6">Opening</th><th class="p-1 w-1/6">Purchase</th><th class="p-1 w-1/6">Paid</th><th class="p-1 w-1/6 bg-blue-950">Due (>10)</th></tr></thead><tbody class="divide-y divide-slate-100 font-bold">`;
-    if (vendorsConsolidatedSummary.length === 0) {
-      tableHtml += `<tr><td colspan="6" class="p-4 text-center text-slate-400 font-bold">10 റിയാലിൽ കൂടുതൽ കുടിശ്ശികയുള്ള വെണ്ടർമാർ ഇല്ല</td></tr>`;
-    } else {
+    if (vendorsConsolidatedSummary.length === 0) tableHtml += `<tr><td colspan="6" class="p-4 text-center text-slate-400 font-bold">10 റിയാലിൽ കൂടുതൽ കുടിശ്ശികയുള്ള വെണ്ടർമാർ ഇല്ല</td></tr>`;
+    else {
       vendorsConsolidatedSummary.forEach((r, idx) => {
         tableHtml += `<tr class="text-center hover:bg-slate-50"><td class="p-1">${idx + 1}</td><td class="p-1 text-left truncate">${formatShortName(r.name)}</td><td class="p-1">${r.opening.toLocaleString('en-IN')}</td><td class="p-1 text-blue-700">${r.purchases.toLocaleString('en-IN')}</td><td class="p-1 text-emerald-700">${r.paid.toLocaleString('en-IN')}</td><td class="p-1 font-black text-rose-700">${r.closing.toLocaleString('en-IN')}</td></tr>`;
       });
@@ -1022,9 +1027,8 @@ function generateStatement() {
     tableHtml += `</tbody></table>`;
   } else if (type === 'agent' && isAllAgentsMode) {
     tableHtml = `<table class="w-full border-collapse bg-white rounded-xl overflow-hidden shadow-sm table-fixed"><thead><tr class="bg-indigo-900 text-white font-black text-center border-b"><th class="p-1 w-6">#</th><th class="p-1 w-2/6 text-left">Route Agent</th><th class="p-1 w-1/6">Parties</th><th class="p-1 w-1/6">Sales</th><th class="p-1 w-1/6">Collected</th><th class="p-1 w-1/6 bg-indigo-950">Due (>10)</th></tr></thead><tbody class="divide-y divide-slate-100 font-bold">`;
-    if (agentsConsolidatedSummary.length === 0) {
-      tableHtml += `<tr><td colspan="6" class="p-4 text-center text-slate-400 font-bold">10 റിയാലിൽ കൂടുതൽ കുടിശ്ശികയുള്ള ഏജന്റുമാർ ഇല്ല</td></tr>`;
-    } else {
+    if (agentsConsolidatedSummary.length === 0) tableHtml += `<tr><td colspan="6" class="p-4 text-center text-slate-400 font-bold">10 റിയാലിൽ കൂടുതൽ കുടിശ്ശികയുള്ള ഏജന്റുമാർ ഇല്ല</td></tr>`;
+    else {
       agentsConsolidatedSummary.forEach((r, idx) => {
         tableHtml += `<tr class="text-center hover:bg-slate-50"><td class="p-1">${idx + 1}</td><td class="p-1 text-left truncate">${formatShortName(r.name)}</td><td class="p-1 text-slate-700">${r.custCount}</td><td class="p-1 text-amber-700">${r.sales.toLocaleString('en-IN')}</td><td class="p-1 text-emerald-700">${r.paid.toLocaleString('en-IN')}</td><td class="p-1 font-black text-indigo-950">${r.closing.toLocaleString('en-IN')}</td></tr>`;
       });
@@ -1032,9 +1036,8 @@ function generateStatement() {
     tableHtml += `</tbody></table>`;
   } else if (type === 'agent' && !isAllAgentsMode) {
     tableHtml = `<table class="w-full border-collapse bg-white rounded-xl overflow-hidden shadow-sm table-fixed"><thead><tr class="bg-indigo-900 text-white font-black text-center border-b"><th class="p-1 w-6">#</th><th class="p-1 w-2/6 text-left">Customer</th><th class="p-1 w-1/6">Opening</th><th class="p-1 w-1/6">Sales</th><th class="p-1 w-1/6">Paid</th><th class="p-1 w-1/6 bg-indigo-950">Due (>10)</th></tr></thead><tbody class="divide-y divide-slate-100 font-bold">`;
-    if (singleAgentCustomersSummary.length === 0) {
-      tableHtml += `<tr><td colspan="6" class="p-4 text-center text-slate-400 font-bold">ഈ ഏജന്റിന് കീഴിൽ 10 റിയാലിൽ കൂടുതൽ കുടിശ്ശികയുള്ള കസ്റ്റമർമാർ ഇല്ല</td></tr>`;
-    } else {
+    if (singleAgentCustomersSummary.length === 0) tableHtml += `<tr><td colspan="6" class="p-4 text-center text-slate-400 font-bold">ഈ ഏജന്റിന് കീഴിൽ 10 റിയാലിൽ കൂടുതൽ കുടിശ്ശികയുള്ള കസ്റ്റമർമാർ ഇല്ല</td></tr>`;
+    else {
       singleAgentCustomersSummary.forEach((r, idx) => {
         tableHtml += `<tr class="text-center hover:bg-slate-50"><td class="p-1">${idx + 1}</td><td class="p-1 text-left truncate">${formatShortName(r.name)}</td><td class="p-1">${r.opening.toLocaleString('en-IN')}</td><td class="p-1 text-amber-700">${r.sales.toLocaleString('en-IN')}</td><td class="p-1 text-emerald-700">${r.paid.toLocaleString('en-IN')}</td><td class="p-1 font-black text-indigo-950">${r.closing.toLocaleString('en-IN')}</td></tr>`;
       });
@@ -1042,9 +1045,8 @@ function generateStatement() {
     tableHtml += `</tbody></table>`;
   } else if (type === 'employee' && isAllEmployeesMode) {
     tableHtml = `<table class="w-full border-collapse bg-white rounded-xl overflow-hidden shadow-sm table-fixed"><thead><tr class="bg-purple-900 text-white font-black text-center border-b"><th class="p-1 w-6">#</th><th class="p-1 w-2/6 text-left">Staff Name</th><th class="p-1 w-1/6">Salary</th><th class="p-1 w-1/6">Paid</th><th class="p-1 w-1/6 bg-purple-950">Pending (>10)</th></tr></thead><tbody class="divide-y divide-slate-100 font-bold">`;
-    if (employeesConsolidatedSummary.length === 0) {
-      tableHtml += `<tr><td colspan="6" class="p-4 text-center text-slate-400 font-bold">10 റിയാലിൽ കൂടുതൽ ശമ്പളം ബാക്കിയുള്ളവർ ഇല്ല</td></tr>`;
-    } else {
+    if (employeesConsolidatedSummary.length === 0) tableHtml += `<tr><td colspan="6" class="p-4 text-center text-slate-400 font-bold">10 റിയാലിൽ കൂടുതൽ ശമ്പളം ബാക്കിയുള്ളവർ ഇല്ല</td></tr>`;
+    else {
       employeesConsolidatedSummary.forEach((r, idx) => {
         tableHtml += `<tr class="text-center hover:bg-slate-50"><td class="p-1">${idx + 1}</td><td class="p-1 text-left truncate">${formatShortName(r.name)}</td><td class="p-1">${r.salary.toLocaleString('en-IN')}</td><td class="p-1 text-emerald-700">${r.paid.toLocaleString('en-IN')}</td><td class="p-1 font-black text-purple-950">${r.closing.toLocaleString('en-IN')}</td></tr>`;
       });
@@ -1052,9 +1054,8 @@ function generateStatement() {
     tableHtml += `</tbody></table>`;
   } else if (isAllUtilityBillsMode) {
     tableHtml = `<table class="w-full border-collapse bg-white rounded-xl overflow-hidden shadow-sm table-fixed"><thead><tr class="bg-amber-900 text-white font-black text-center border-b"><th class="p-1 w-6">#</th><th class="p-1 w-2/6 text-left">Utility/Bill</th><th class="p-1 w-1/6">Opening</th><th class="p-1 w-1/6">New Bills</th><th class="p-1 w-1/6">Paid</th><th class="p-1 w-1/6 bg-amber-950">Due (>10)</th></tr></thead><tbody class="divide-y divide-slate-100 font-bold">`;
-    if (utilitiesConsolidatedSummary.length === 0) {
-      tableHtml += `<tr><td colspan="6" class="p-4 text-center text-slate-400 font-bold">10 റിയാലിൽ കൂടുതൽ കുടിശ്ശികയുള്ള ബില്ലുകൾ ഇല്ല</td></tr>`;
-    } else {
+    if (utilitiesConsolidatedSummary.length === 0) tableHtml += `<tr><td colspan="6" class="p-4 text-center text-slate-400 font-bold">10 റിയാലിൽ കൂടുതൽ കുടിശ്ശികയുള്ള ബില്ലുകൾ ഇല്ല</td></tr>`;
+    else {
       utilitiesConsolidatedSummary.forEach((r, idx) => {
         tableHtml += `<tr class="text-center hover:bg-slate-50"><td class="p-1">${idx + 1}</td><td class="p-1 text-left truncate">${formatShortName(r.name)}</td><td class="p-1">${r.opening.toLocaleString('en-IN')}</td><td class="p-1 text-indigo-700">${r.bills.toLocaleString('en-IN')}</td><td class="p-1 text-emerald-700">${r.paid.toLocaleString('en-IN')}</td><td class="p-1 font-black text-amber-900">${r.closing.toLocaleString('en-IN')}</td></tr>`;
       });
@@ -1131,10 +1132,9 @@ function shareActiveReportWhatsApp() {
 function downloadMasterExcel() {
   try {
     if (typeof XLSX === 'undefined') return alert("Excel ലൈബ്രറി ലോഡ് ആയിട്ടില്ല!");
-
     const wb = XLSX.utils.book_new();
 
-    const custData = customersList.map(c => ({
+    const custData = (customersList || []).map(c => ({
       "Name": c.name,
       "Type": c.type || 'credit',
       "Agent": getCustomerAgentName(c),
@@ -1144,7 +1144,7 @@ function downloadMasterExcel() {
     const wsCust = XLSX.utils.json_to_sheet(custData);
     XLSX.utils.book_append_sheet(wb, wsCust, "Customers");
 
-    const vendData = vendorsList.map(v => ({
+    const vendData = (vendorsList || []).map(v => ({
       "Name": v.name,
       "Type": v.type || 'credit',
       "Opening_Balance": v.opening_balance || 0
@@ -1152,7 +1152,7 @@ function downloadMasterExcel() {
     const wsVend = XLSX.utils.json_to_sheet(vendData);
     XLSX.utils.book_append_sheet(wb, wsVend, "Vendors");
 
-    const empData = employeesList.map(e => ({
+    const empData = (employeesList || []).map(e => ({
       "Name": e.name,
       "Monthly_Salary": e.monthly_salary || 0,
       "Joining_Date": e.joining_date || '',
@@ -1162,7 +1162,7 @@ function downloadMasterExcel() {
     const wsEmp = XLSX.utils.json_to_sheet(empData);
     XLSX.utils.book_append_sheet(wb, wsEmp, "Employees");
 
-    const expData = expensesMasterList.map(ex => ({
+    const expData = (expensesMasterList || []).map(ex => ({
       "Name": ex.name,
       "Type": ex.type || 'regular',
       "Opening_Balance": ex.opening_balance || 0
@@ -1287,8 +1287,8 @@ async function uploadMasterExcel(event) {
       localStorage.setItem(`ALNASSR_${currentShopId}_EMPLOYEES`, JSON.stringify(employeesList));
       localStorage.setItem(`ALNASSR_${currentShopId}_EXPENSES`, JSON.stringify(expensesMasterList));
 
-      populateDropdowns();
-      renderActiveMasterList();
+      if (typeof populateDropdowns === 'function') populateDropdowns();
+      if (typeof renderActiveMasterList === 'function') renderActiveMasterList();
       alert("എക്സൽ ഫയലിൽ നിന്നുള്ള വിവരങ്ങൾ വിജയകരമായി സിങ്ക് ചെയ്തു!");
     } catch (err) {
       alert("എക്സൽ റീഡിങ് പിശക്: " + err.message);
@@ -1299,7 +1299,7 @@ async function uploadMasterExcel(event) {
 }
 
 // ========================================================
-// 6. 1-CLICK FULL BACKUP & RESTORE (DISASTER RECOVERY JSON)
+// 6. 1-CLICK FULL BACKUP & RESTORE (WITH COMPLETE CLOUD RESTORE)
 // ========================================================
 function downloadFullBackupJSON() {
   try {
@@ -1324,7 +1324,9 @@ function downloadFullBackupJSON() {
     const a = document.createElement("a");
     a.href = url;
     a.download = `ALNASSR_BACKUP_${currentShopId || 'SHOP'}_${getSaudiBusinessDate()}.json`;
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
     URL.revokeObjectURL(url);
   } catch (err) {
     alert("ബാക്കപ്പ് എടുക്കാൻ കഴിഞ്ഞില്ല: " + err.message);
@@ -1332,66 +1334,141 @@ function downloadFullBackupJSON() {
 }
 
 async function requestRestoreBackup(event) {
-  const file = event.target.files[0];
-  if (!file) return;
+  try {
+    const file = event.target.files[0];
+    if (!file) return;
 
-  const enteredPin = prompt("ബാക്കപ്പ് റീസ്റ്റോർ ചെയ്യാൻ സൂപ്പർ അഡ്മിൻ മാസ്റ്റർ പിൻ നൽകുക:");
-  const masterPin = getMasterPin();
-  if (enteredPin !== masterPin) {
-    event.target.value = "";
-    return alert("അഡ്മിൻ മാസ്റ്റർ പിൻ തെറ്റാണ്!");
-  }
+    const enteredPin = prompt("ബാക്കപ്പ് റീസ്റ്റോർ ചെയ്യാൻ സൂപ്പർ അഡ്മിൻ മാസ്റ്റർ പിൻ നൽകുക:");
+    const masterPin = getMasterPin();
+    if (enteredPin !== masterPin) {
+      event.target.value = "";
+      return alert("അഡ്മിൻ മാസ്റ്റർ പിൻ തെറ്റാണ്!");
+    }
 
-  if (!confirm("⚠️ മുന്നറിയിപ്പ്: ഈ ബാക്കപ്പ് റീസ്റ്റോർ ചെയ്താൽ നിലവിലുള്ള എല്ലാ ഡാറ്റയും മാറ്റിയെഴുതപ്പെടും!\n\nതുടരണമെന്ന് ഉറപ്പാണോ?")) {
-    event.target.value = "";
-    return;
-  }
+    if (!confirm("⚠️ മുന്നറിയിപ്പ്: ഈ ബാക്കപ്പ് റീസ്റ്റോർ ചെയ്താൽ നിലവിലുള്ള എല്ലാ ഡാറ്റയും ക്ലൗഡ് ഡാറ്റാബേസിലും ഫോണിലും മാറ്റിയെഴുതപ്പെടും!\n\nതുടരണമെന്ന് ഉറപ്പാണോ?")) {
+      event.target.value = "";
+      return;
+    }
 
-  const reader = new FileReader();
-  reader.onload = async function (e) {
-    try {
-      const backupData = JSON.parse(e.target.result);
-      if (!backupData.customers && !backupData.transactions) {
-        return alert("അസാധുവായ ബാക്കപ്പ് ഫയൽ!");
-      }
+    const reader = new FileReader();
+    reader.onload = async function (e) {
+      try {
+        const backupData = JSON.parse(e.target.result);
+        if (!backupData.customers && !backupData.transactions) {
+          return alert("അസാധുവായ ബാക്കപ്പ് ഫയൽ!");
+        }
 
-      customersList = backupData.customers || [];
-      vendorsList = backupData.vendors || [];
-      employeesList = backupData.employees || [];
-      expensesMasterList = backupData.expenses_master || [];
-      agentsList = backupData.agents || [];
-      transactionsList = backupData.transactions || [];
-      if (backupData.opening_settings) openingSettings = backupData.opening_settings;
+        customersList = backupData.customers || [];
+        vendorsList = backupData.vendors || [];
+        employeesList = backupData.employees || [];
+        expensesMasterList = backupData.expenses_master || [];
+        agentsList = backupData.agents || [];
+        transactionsList = backupData.transactions || [];
+        if (backupData.opening_settings) openingSettings = backupData.opening_settings;
 
-      localStorage.setItem(`ALNASSR_${currentShopId}_CUSTOMERS`, JSON.stringify(customersList));
-      localStorage.setItem(`ALNASSR_${currentShopId}_VENDORS`, JSON.stringify(vendorsList));
-      localStorage.setItem(`ALNASSR_${currentShopId}_EMPLOYEES`, JSON.stringify(employeesList));
-      localStorage.setItem(`ALNASSR_${currentShopId}_EXPENSES`, JSON.stringify(expensesMasterList));
-      localStorage.setItem(`ALNASSR_${currentShopId}_AGENTS`, JSON.stringify(agentsList));
-      localStorage.setItem(`ALNASSR_${currentShopId}_TRANSACTIONS`, JSON.stringify(transactionsList));
+        localStorage.setItem(`ALNASSR_${currentShopId}_CUSTOMERS`, JSON.stringify(customersList));
+        localStorage.setItem(`ALNASSR_${currentShopId}_VENDORS`, JSON.stringify(vendorsList));
+        localStorage.setItem(`ALNASSR_${currentShopId}_EMPLOYEES`, JSON.stringify(employeesList));
+        localStorage.setItem(`ALNASSR_${currentShopId}_EXPENSES`, JSON.stringify(expensesMasterList));
+        localStorage.setItem(`ALNASSR_${currentShopId}_AGENTS`, JSON.stringify(agentsList));
+        localStorage.setItem(`ALNASSR_${currentShopId}_TRANSACTIONS`, JSON.stringify(transactionsList));
 
-      if (navigator.onLine && supabaseClient) {
-        alert("ക്ലൗഡിലേക്ക് ഡാറ്റ ബാക്കപ്പ് അപ്‌ലോഡ് ചെയ്യുന്നു. അല്പം കാത്തിരിക്കുക...");
-        if (transactionsList.length > 0) {
-          const chunkSize = 200;
-          for (let i = 0; i < transactionsList.length; i += chunkSize) {
-            const chunk = transactionsList.slice(i, i + chunkSize).map(t => {
-              const { id, ...cleanT } = t;
-              return cleanT;
-            });
-            await supabaseClient.from('transactions').upsert(chunk);
+        // ക്ലൗഡ് ഡാറ്റാബേസിലേക്ക് (SUPABASE) സമ്പൂർണ്ണമായി അപ്‌ലോഡ് ചെയ്യുന്നു
+        if (navigator.onLine && supabaseClient) {
+          alert("ക്ലൗഡ് ഡാറ്റാബേസിലേക്ക് എല്ലാ വിവരങ്ങളും റീസ്റ്റോർ ചെയ്യുന്നു. അല്പം കാത്തിരിക്കുക...");
+
+          // A. Settings
+          if (backupData.opening_settings) {
+            try {
+              const { data: setRow } = await supabaseClient.from('app_settings').select('*');
+              if (setRow && setRow[0]) {
+                await supabaseClient.from('app_settings').update({
+                  opening_cash: backupData.opening_settings.openingCash || 0,
+                  opening_bank: backupData.opening_settings.openingBank || 0
+                }).eq('id', setRow[0].id);
+              } else {
+                await supabaseClient.from('app_settings').insert([{
+                  opening_cash: backupData.opening_settings.openingCash || 0,
+                  opening_bank: backupData.opening_settings.openingBank || 0
+                }]);
+              }
+            } catch (errSet) { console.warn("Settings restore:", errSet); }
+          }
+
+          // B. Agents
+          if (agentsList.length > 0) {
+            const cleanAgents = agentsList.map(a => ({ name: (a.name || '').trim().toUpperCase() }));
+            await supabaseClient.from('agents').upsert(cleanAgents);
+          }
+
+          // C. Customers
+          if (customersList.length > 0) {
+            const cleanCust = customersList.map(c => ({
+              name: (c.name || '').trim().toUpperCase(),
+              type: c.type || 'credit',
+              agent_name: c.agent_name || '',
+              opening_balance: parseFloat(c.opening_balance) || 0,
+              credit_limit: parseFloat(c.credit_limit) || 0
+            }));
+            await supabaseClient.from('customers').upsert(cleanCust);
+          }
+
+          // D. Vendors
+          if (vendorsList.length > 0) {
+            const cleanVend = vendorsList.map(v => ({
+              name: (v.name || '').trim().toUpperCase(),
+              type: v.type || 'credit',
+              opening_balance: parseFloat(v.opening_balance) || 0
+            }));
+            await supabaseClient.from('vendors').upsert(cleanVend);
+          }
+
+          // E. Employees
+          if (employeesList.length > 0) {
+            const cleanEmp = employeesList.map(em => ({
+              name: (em.name || '').trim().toUpperCase(),
+              monthly_salary: parseFloat(em.monthly_salary) || 0,
+              opening_advance: parseFloat(em.opening_advance || em.opening_balance) || 0,
+              joining_date: em.joining_date || '',
+              status: em.status || 'active'
+            }));
+            await supabaseClient.from('employees').upsert(cleanEmp);
+          }
+
+          // F. Expenses Master
+          if (expensesMasterList.length > 0) {
+            const cleanExp = expensesMasterList.map(ex => ({
+              name: (ex.name || '').trim().toUpperCase(),
+              type: ex.type || 'regular',
+              opening_balance: parseFloat(ex.opening_balance) || 0
+            }));
+            await supabaseClient.from('expenses_master').upsert(cleanExp);
+          }
+
+          // G. Transactions (Chunked)
+          if (transactionsList.length > 0) {
+            const chunkSize = 150;
+            for (let i = 0; i < transactionsList.length; i += chunkSize) {
+              const chunk = transactionsList.slice(i, i + chunkSize).map(t => {
+                const { id, ...cleanT } = t;
+                return cleanT;
+              });
+              await supabaseClient.from('transactions').upsert(chunk);
+            }
           }
         }
-      }
 
-      populateDropdowns();
-      renderActiveMasterList();
-      closeBackupModal();
-      alert("സിസ്റ്റം ബാക്കപ്പ് വിജയകരമായി റീസ്റ്റോർ ചെയ്തു!");
-    } catch (err) {
-      alert("റീസ്റ്റോർ പിശക്: " + err.message);
-    }
-  };
-  reader.readAsText(file);
-  event.target.value = "";
+        if (typeof populateDropdowns === 'function') populateDropdowns();
+        if (typeof renderQuickTotalsAndRecent === 'function') renderQuickTotalsAndRecent();
+        if (typeof closeBackupModal === 'function') closeBackupModal();
+        alert("🎉 അഭിനന്ദനങ്ങൾ! കസ്റ്റമർമാർ, വെണ്ടർമാർ, ജീവനക്കാർ, ഇടപാടുകൾ എന്നിവയെല്ലാം വിജയകരമായി ക്ലൗഡിലേക്കും ഫോണിലേക്കും റീസ്റ്റോർ ചെയ്തു!");
+      } catch (errInner) {
+        alert("റീസ്റ്റോർ പിശക്: " + errInner.message);
+      }
+    };
+    reader.readAsText(file);
+    event.target.value = "";
+  } catch (errOuter) {
+    alert("ഫയൽ റീഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല: " + errOuter.message);
+  }
 }
