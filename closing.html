@@ -32,22 +32,61 @@
     }
   </style>
 </head>
-<body class="bg-slate-100 text-slate-800 min-h-screen p-2 sm:p-5 text-xs">
+<body class="bg-slate-100 text-slate-800 min-h-screen p-2 sm:p-5 text-xs flex flex-col justify-center items-center">
 
-  <div class="max-w-2xl mx-auto bg-white rounded-2xl shadow-lg border border-slate-200 p-4 sm:p-6 print-border space-y-3.5">
+  <!-- ========================================== -->
+  <!-- 1. LOGIN SCREEN (PIN PROTECTION)           -->
+  <!-- ========================================== -->
+  <div id="loginScreen" class="w-full max-w-sm bg-white p-6 rounded-3xl shadow-2xl border border-slate-200 text-center space-y-4">
+    <div class="w-14 h-14 bg-emerald-100 text-emerald-700 rounded-2xl flex items-center justify-center mx-auto shadow-inner">
+      <i data-lucide="lock" class="w-7 h-7"></i>
+    </div>
+    <div>
+      <h2 class="text-base font-black text-slate-900 uppercase">ക്യാഷ് ക്ലോസിംഗ് ലോഗിൻ</h2>
+      <p class="text-[11px] font-bold text-slate-500 mt-0.5">തുടരാൻ ഷോപ്പ് പിൻ അല്ലെങ്കിൽ മാസ്റ്റർ പിൻ നൽകുക</p>
+    </div>
+    <div>
+      <input 
+        type="password" 
+        id="loginPinInput" 
+        maxlength="6" 
+        inputmode="numeric" 
+        pattern="[0-9]*" 
+        placeholder="••••" 
+        class="w-full text-center text-2xl font-black tracking-widest p-2.5 rounded-2xl border-2 border-slate-300 bg-slate-50 outline-none focus:border-emerald-600 focus:bg-white transition"
+        onkeydown="if(event.key === 'Enter') verifyLogin();"
+      />
+    </div>
+    <button 
+      type="button" 
+      onclick="verifyLogin()" 
+      class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-black text-xs rounded-xl shadow-lg shadow-emerald-600/30 transition cursor-pointer">
+      ലോഗിൻ ചെയ്യുക
+    </button>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- 2. MAIN APP CONTAINER                      -->
+  <!-- ========================================== -->
+  <div id="appContainer" class="w-full max-w-2xl bg-white rounded-2xl shadow-lg border border-slate-200 p-4 sm:p-6 print-border space-y-3.5 hidden">
     
-    <!-- TOP CONTROLS (SHOP SELECTOR & DATE) -->
+    <!-- TOP CONTROLS (SHOP SELECTOR, DATE & LOGOUT) -->
     <div class="no-print bg-slate-50 p-2.5 rounded-xl border border-slate-200 flex flex-wrap justify-between items-center gap-2">
       <div class="flex items-center gap-2">
         <label class="font-black text-slate-700">ഷോപ്പ്:</label>
+        <!-- Master PIN ലോഗിൻ ചെയ്താൽ മാത്രം സെലക്ടർ കാണും, Shop PIN ആണെങ്കിൽ ഫിക്സഡ് പേര് കാണിക്കും -->
         <select id="shopSelector" onchange="onShopChange()" class="p-1.5 px-3 border border-slate-300 rounded-lg font-black bg-white outline-none cursor-pointer">
           <!-- Dynamic Shops from config.js -->
         </select>
+        <span id="shopFixedBadge" class="hidden font-black text-xs text-emerald-800 bg-emerald-100 px-2.5 py-1 rounded-lg"></span>
       </div>
 
       <div class="flex items-center gap-2">
         <label class="font-black text-slate-700">തീയതി:</label>
         <input type="date" id="closingDate" onchange="saveData()" class="p-1 px-2 border border-slate-300 rounded-lg font-black bg-white outline-none" />
+        <button onclick="logoutApp()" title="ലോഗൗട്ട്" class="p-1 px-2 text-rose-600 hover:bg-rose-50 rounded-lg border border-rose-200 font-bold transition flex items-center gap-1 cursor-pointer">
+          <i data-lucide="log-out" class="w-3.5 h-3.5"></i>
+        </button>
       </div>
     </div>
 
@@ -96,7 +135,7 @@
 
       <div class="flex justify-between items-center pt-1.5 border-t border-blue-200 text-xs font-black text-blue-950">
         <span>ആകെ മദാ ബാങ്ക് (Total Mada):</span>
-        <span id="displayTotalMada" class="text-xs text-blue-900 font-mono">0.00 SR</span>
+        <span id="displayTotalMada" class="text-xs text-blue-900 font-mono">0.00</span>
       </div>
     </div>
 
@@ -132,7 +171,7 @@
           <tr class="bg-amber-100 text-amber-950 font-black text-[11px] border-b">
             <th class="p-1.5 w-8 text-center">#</th>
             <th class="p-1.5">ഇനം / വിവരണം</th>
-            <th class="p-1.5 text-right w-28">തുക (SR)</th>
+            <th class="p-1.5 text-right w-28">തുക</th>
             <th class="p-1.5 text-center w-8 no-print">✕</th>
           </tr>
         </thead>
@@ -149,21 +188,21 @@
       </table>
     </div>
 
-    <!-- 4. FINAL CLOSING SUMMARY (COMPACT & BOLD) -->
+    <!-- 4. FINAL CLOSING SUMMARY (COMPACT & BOLD - NO CURRENCY SYMBOL) -->
     <div class="bg-slate-900 text-white p-3 sm:p-4 rounded-xl space-y-2 print-box border border-slate-950">
       <div class="flex justify-between items-center text-emerald-400 border-b border-slate-800 pb-1 text-xs">
         <span class="font-bold">1. ടോട്ടൽ ക്യാഷ് സെയിൽ (Cash + Expenses):</span>
-        <span id="finalCashSale" class="font-black font-mono text-sm">0.00 SR</span>
+        <span id="finalCashSale" class="font-black font-mono text-sm">0.00</span>
       </div>
 
       <div class="flex justify-between items-center text-blue-400 border-b border-slate-800 pb-1 text-xs">
         <span class="font-bold">2. ടോട്ടൽ ബാങ്ക് സെയിൽ (Total Mada POS):</span>
-        <span id="finalBankSale" class="font-black font-mono text-sm">0.00 SR</span>
+        <span id="finalBankSale" class="font-black font-mono text-sm">0.00</span>
       </div>
 
       <div class="flex justify-between items-center text-amber-400 pt-1 text-sm font-black">
         <span>⭐ ആകെ കച്ചവടം (GRAND TOTAL SALES):</span>
-        <span id="finalGrandSale" class="font-mono text-base underline decoration-double">0.00 SR</span>
+        <span id="finalGrandSale" class="font-mono text-base underline decoration-double">0.00</span>
       </div>
     </div>
 
@@ -195,7 +234,26 @@
   </div>
 
   <script>
+    function getShopsList() {
+      if (window.SHOPS_CONFIG && Array.isArray(window.SHOPS_CONFIG) && window.SHOPS_CONFIG.length > 0) return window.SHOPS_CONFIG;
+      if (window.SHOPS && Array.isArray(window.SHOPS) && window.SHOPS.length > 0) return window.SHOPS;
+      try {
+        if (typeof SHOPS_CONFIG !== 'undefined' && Array.isArray(SHOPS_CONFIG) && SHOPS_CONFIG.length > 0) return SHOPS_CONFIG;
+        if (typeof SHOPS !== 'undefined' && Array.isArray(SHOPS) && SHOPS.length > 0) return SHOPS;
+      } catch(e) {}
+      return [];
+    }
+
+    function getMasterPin() {
+      if (window.MASTER_PIN !== undefined && window.MASTER_PIN !== null) return String(window.MASTER_PIN).trim();
+      try {
+        if (typeof MASTER_PIN !== 'undefined' && MASTER_PIN !== null) return String(MASTER_PIN).trim();
+      } catch(e) {}
+      return null;
+    }
+
     var currentShop = null;
+    var userRole = 'shop';
     var closingState = {
       date: new Date().toISOString().split('T')[0],
       counterCash: 0,
@@ -203,15 +261,87 @@
       expenses: []
     };
 
+    // ==========================================
+    // LOGIN VERIFICATION
+    // ==========================================
+    function verifyLogin() {
+      const pinInput = document.getElementById("loginPinInput");
+      const enteredPin = String(pinInput.value || '').trim();
+      if (!enteredPin) return alert("പിൻ നമ്പർ നൽകുക!");
+
+      const masterPin = getMasterPin();
+      const shops = getShopsList();
+
+      const isMaster = (masterPin && enteredPin === masterPin);
+      const matchedShop = (shops || []).find(s => String(s.pin).trim() === enteredPin);
+
+      if (!isMaster && !matchedShop) {
+        alert("പിൻ തെറ്റാണ്!");
+        pinInput.value = "";
+        pinInput.focus();
+        return;
+      }
+
+      sessionStorage.setItem("ALNASSR_CLOSING_LOGGED_IN", "true");
+
+      if (isMaster) {
+        sessionStorage.setItem("ALNASSR_CLOSING_ROLE", "admin");
+        userRole = 'admin';
+      } else {
+        sessionStorage.setItem("ALNASSR_CLOSING_ROLE", "shop");
+        sessionStorage.setItem("ALNASSR_CLOSING_SHOP_ID", matchedShop.id);
+        userRole = 'shop';
+      }
+
+      pinInput.value = "";
+      checkLoginState();
+    }
+
+    function checkLoginState() {
+      const isLogged = sessionStorage.getItem("ALNASSR_CLOSING_LOGGED_IN") === "true";
+      const loginEl = document.getElementById("loginScreen");
+      const appEl = document.getElementById("appContainer");
+
+      if (isLogged) {
+        loginEl.classList.add("hidden");
+        appEl.classList.remove("hidden");
+        userRole = sessionStorage.getItem("ALNASSR_CLOSING_ROLE") || 'shop';
+        initShops();
+      } else {
+        loginEl.classList.remove("hidden");
+        appEl.classList.add("hidden");
+        setTimeout(() => {
+          const inp = document.getElementById("loginPinInput");
+          if (inp) inp.focus();
+        }, 150);
+      }
+    }
+
+    function logoutApp() {
+      sessionStorage.removeItem("ALNASSR_CLOSING_LOGGED_IN");
+      sessionStorage.removeItem("ALNASSR_CLOSING_ROLE");
+      sessionStorage.removeItem("ALNASSR_CLOSING_SHOP_ID");
+      checkLoginState();
+    }
+
+    // ==========================================
+    // MULTI-SHOP INITIALIZATION
+    // ==========================================
     function initShops() {
-      const shops = (window.SHOPS_CONFIG || window.SHOPS || []);
+      const shops = getShopsList();
       const sel = document.getElementById("shopSelector");
+      const badge = document.getElementById("shopFixedBadge");
       sel.innerHTML = "";
 
       if (shops.length === 0) {
         sel.innerHTML = `<option value="default">Default Shop</option>`;
         currentShop = { id: 'default', name: 'ALNASSR' };
-      } else {
+        sel.classList.remove("hidden");
+        badge.classList.add("hidden");
+      } else if (userRole === 'admin') {
+        // Master PIN: Can choose any shop from dropdown
+        sel.classList.remove("hidden");
+        badge.classList.add("hidden");
         shops.forEach(s => {
           const opt = document.createElement("option");
           opt.value = s.id;
@@ -221,13 +351,21 @@
         const savedShopId = localStorage.getItem("ALNASSR_SELECTED_SHOP_ID") || shops[0].id;
         sel.value = savedShopId;
         currentShop = shops.find(s => s.id === sel.value) || shops[0];
+      } else {
+        // Specific Shop PIN: Locked to this shop only
+        const activeShopId = sessionStorage.getItem("ALNASSR_CLOSING_SHOP_ID");
+        currentShop = shops.find(s => s.id === activeShopId) || shops[0];
+        sel.classList.add("hidden");
+        badge.classList.remove("hidden");
+        badge.innerText = currentShop.name;
       }
+
       applyShopDetails();
       loadData();
     }
 
     function onShopChange() {
-      const shops = (window.SHOPS_CONFIG || window.SHOPS || []);
+      const shops = getShopsList();
       const sel = document.getElementById("shopSelector");
       currentShop = shops.find(s => s.id === sel.value) || { id: sel.value, name: sel.value };
       localStorage.setItem("ALNASSR_SELECTED_SHOP_ID", currentShop.id);
@@ -246,6 +384,9 @@
       }
     }
 
+    // ==========================================
+    // DATA PERSISTENCE (LOCALSTORAGE)
+    // ==========================================
     function loadData() {
       const shopId = currentShop ? currentShop.id : 'default';
       const saved = localStorage.getItem(`ALNASSR_${shopId}_CLOSING`);
@@ -277,7 +418,9 @@
       localStorage.setItem(`ALNASSR_${shopId}_CLOSING`, JSON.stringify(closingState));
     }
 
+    // ==========================================
     // MADA POS
+    // ==========================================
     function renderMadaMachines() {
       const container = document.getElementById("madaMachinesList");
       container.innerHTML = "";
@@ -308,7 +451,9 @@
       saveData();
     }
 
+    // ==========================================
     // EXPENSES
+    // ==========================================
     function renderExpensesTable() {
       const tbody = document.getElementById("expensesTableBody");
       tbody.innerHTML = "";
@@ -352,7 +497,9 @@
       saveData();
     }
 
-    // TOTALS
+    // ==========================================
+    // TOTALS (NO CURRENCY SYMBOLS)
+    // ==========================================
     function calculateTotals() {
       const counterCash = parseFloat(document.getElementById("counterCash").value) || 0;
       let totalMada = 0;
@@ -364,15 +511,17 @@
       const totalCashSale = counterCash + totalExpenses;
       const grandTotal = totalCashSale + totalMada;
 
-      document.getElementById("displayTotalMada").innerText = `${totalMada.toLocaleString('en-IN', { minimumFractionDigits: 2 })} SR`;
+      document.getElementById("displayTotalMada").innerText = totalMada.toLocaleString('en-IN', { minimumFractionDigits: 2 });
       document.getElementById("displayTotalExpenses").innerText = totalExpenses.toLocaleString('en-IN', { minimumFractionDigits: 2 });
 
-      document.getElementById("finalCashSale").innerText = `${totalCashSale.toLocaleString('en-IN', { minimumFractionDigits: 2 })} SR`;
-      document.getElementById("finalBankSale").innerText = `${totalMada.toLocaleString('en-IN', { minimumFractionDigits: 2 })} SR`;
-      document.getElementById("finalGrandSale").innerText = `${grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })} SR`;
+      document.getElementById("finalCashSale").innerText = totalCashSale.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+      document.getElementById("finalBankSale").innerText = totalMada.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+      document.getElementById("finalGrandSale").innerText = grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 });
     }
 
-    // WHATSAPP
+    // ==========================================
+    // WHATSAPP (NO CURRENCY SYMBOLS)
+    // ==========================================
     function shareWhatsApp() {
       const dt = document.getElementById("closingDate").value;
       const shopName = currentShop ? currentShop.name.toUpperCase() : "ALNASSR";
@@ -382,14 +531,14 @@
       let madaText = "";
       closingState.madaMachines.forEach(m => {
         totalMada += (m.amount || 0);
-        if (m.amount > 0) madaText += `  ▫️ ${m.label}: ${m.amount} SR\n`;
+        if (m.amount > 0) madaText += `  ▫️ ${m.label}: ${m.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}\n`;
       });
 
       let totalExpenses = 0;
       let expText = "";
       closingState.expenses.forEach(e => {
         totalExpenses += e.amount;
-        expText += `  ▫️ ${e.desc}: ${e.amount} SR\n`;
+        expText += `  ▫️ ${e.desc}: ${e.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}\n`;
       });
 
       const totalCashSale = counterCash + totalExpenses;
@@ -398,21 +547,23 @@
       let text = `📊 *${shopName} - DAILY CASH CLOSING*\n` +
                  `📅 *Date:* ${dt}\n` +
                  `--------------------------------\n` +
-                 `💵 *Counter Cash:* ${counterCash.toLocaleString('en-IN')} SR\n` +
-                 `⚡ *Expenses Outflow:* ${totalExpenses.toLocaleString('en-IN')} SR\n` +
+                 `💵 *Counter Cash:* ${counterCash.toLocaleString('en-IN', { minimumFractionDigits: 2 })}\n` +
+                 `⚡ *Expenses Outflow:* ${totalExpenses.toLocaleString('en-IN', { minimumFractionDigits: 2 })}\n` +
                  (expText ? `${expText}` : '') +
-                 `💰 *Total Cash Sale:* ${totalCashSale.toLocaleString('en-IN')} SR\n` +
+                 `💰 *Total Cash Sale:* ${totalCashSale.toLocaleString('en-IN', { minimumFractionDigits: 2 })}\n` +
                  `--------------------------------\n` +
-                 `💳 *Total Mada Bank:* ${totalMada.toLocaleString('en-IN')} SR\n` +
+                 `💳 *Total Mada Bank:* ${totalMada.toLocaleString('en-IN', { minimumFractionDigits: 2 })}\n` +
                  (madaText ? `${madaText}` : '') +
                  `--------------------------------\n` +
-                 `⭐ *GRAND TOTAL SALES:* ${grandTotal.toLocaleString('en-IN')} SR\n` +
+                 `⭐ *GRAND TOTAL SALES:* ${grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}\n` +
                  `--------------------------------`;
 
       window.open('https://api.whatsapp.com/send?text=' + encodeURIComponent(text), '_blank');
     }
 
-    // RESET
+    // ==========================================
+    // RESET NEW DAY
+    // ==========================================
     function resetDayData() {
       if (!confirm("പുതിയ ദിവസത്തെ കണക്കുകൾ തുടങ്ങാൻ ഈ ഷോപ്പിലെ വിവരങ്ങൾ ക്ലിയർ ചെയ്യണമോ?")) return;
       const shopId = currentShop ? currentShop.id : 'default';
@@ -427,7 +578,7 @@
     }
 
     window.onload = function() {
-      initShops();
+      checkLoginState();
       if (window.lucide) lucide.createIcons();
     };
   </script>
