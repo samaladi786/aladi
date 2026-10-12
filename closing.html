@@ -2,9 +2,17 @@
 <html lang="ml">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Daily Cash Closing - AlNassr</title>
   
+  <!-- PWA META TAGS -->
+  <meta name="theme-color" content="#0f172a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Cash Closing">
+  <link rel="manifest" href="closing-manifest.json">
+  <link rel="apple-touch-icon" href="icon-192.png">
+
   <!-- TAILWIND CSS & ICONS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
@@ -18,12 +26,8 @@
     input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
     input[type=number] { -moz-appearance: textfield; }
 
-    /* COMPACT A4 PRINT SETUP (SINGLE PAGE) */
     @media print {
-      @page {
-        size: A4 portrait;
-        margin: 8mm 10mm;
-      }
+      @page { size: A4 portrait; margin: 8mm 10mm; }
       .no-print { display: none !important; }
       body { background: white !important; padding: 0 !important; color: #000 !important; }
       .print-border { border: 1.5px solid #000 !important; border-radius: 0 !important; }
@@ -34,9 +38,7 @@
 </head>
 <body class="bg-slate-100 text-slate-800 min-h-screen p-2 sm:p-5 text-xs flex flex-col justify-center items-center">
 
-  <!-- ========================================== -->
-  <!-- 1. LOGIN SCREEN (PIN PROTECTION)           -->
-  <!-- ========================================== -->
+  <!-- LOGIN SCREEN -->
   <div id="loginScreen" class="w-full max-w-sm bg-white p-6 rounded-3xl shadow-2xl border border-slate-200 text-center space-y-4">
     <div class="w-14 h-14 bg-emerald-100 text-emerald-700 rounded-2xl flex items-center justify-center mx-auto shadow-inner">
       <i data-lucide="lock" class="w-7 h-7"></i>
@@ -65,25 +67,27 @@
     </button>
   </div>
 
-  <!-- ========================================== -->
-  <!-- 2. MAIN APP CONTAINER                      -->
-  <!-- ========================================== -->
+  <!-- MAIN APP CONTAINER -->
   <div id="appContainer" class="w-full max-w-2xl bg-white rounded-2xl shadow-lg border border-slate-200 p-4 sm:p-6 print-border space-y-3.5 hidden">
     
-    <!-- TOP CONTROLS (SHOP SELECTOR, DATE & LOGOUT) -->
+    <!-- TOP BAR (SHOP, INSTALL, DATE, LOGOUT) -->
     <div class="no-print bg-slate-50 p-2.5 rounded-xl border border-slate-200 flex flex-wrap justify-between items-center gap-2">
       <div class="flex items-center gap-2">
         <label class="font-black text-slate-700">ഷോപ്പ്:</label>
-        <!-- Master PIN ലോഗിൻ ചെയ്താൽ മാത്രം സെലക്ടർ കാണും, Shop PIN ആണെങ്കിൽ ഫിക്സഡ് പേര് കാണിക്കും -->
         <select id="shopSelector" onchange="onShopChange()" class="p-1.5 px-3 border border-slate-300 rounded-lg font-black bg-white outline-none cursor-pointer">
-          <!-- Dynamic Shops from config.js -->
         </select>
         <span id="shopFixedBadge" class="hidden font-black text-xs text-emerald-800 bg-emerald-100 px-2.5 py-1 rounded-lg"></span>
       </div>
 
       <div class="flex items-center gap-2">
+        <!-- PWA INSTALL BUTTON -->
+        <button id="pwaInstallBtn" onclick="triggerPwaInstall()" class="hidden px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-lg text-[11px] shadow flex items-center gap-1 cursor-pointer">
+          <i data-lucide="download" class="w-3.5 h-3.5"></i> ആപ്പ് ഇൻസ്റ്റാൾ ചെയ്യുക
+        </button>
+
         <label class="font-black text-slate-700">തീയതി:</label>
         <input type="date" id="closingDate" onchange="saveData()" class="p-1 px-2 border border-slate-300 rounded-lg font-black bg-white outline-none" />
+        
         <button onclick="logoutApp()" title="ലോഗൗട്ട്" class="p-1 px-2 text-rose-600 hover:bg-rose-50 rounded-lg border border-rose-200 font-bold transition flex items-center gap-1 cursor-pointer">
           <i data-lucide="log-out" class="w-3.5 h-3.5"></i>
         </button>
@@ -105,7 +109,7 @@
       </div>
     </div>
 
-    <!-- 1. COUNTER CASH (COMPACT) -->
+    <!-- 1. COUNTER CASH -->
     <div class="bg-emerald-50/70 p-2.5 rounded-xl border border-emerald-300 print-box flex justify-between items-center">
       <span class="font-black text-emerald-950 text-xs">💵 കൗണ്ടറിലുള്ള ക്യാഷ് (Cash in Drawer):</span>
       <div class="w-40 sm:w-48">
@@ -120,7 +124,7 @@
       </div>
     </div>
 
-    <!-- 2. MADA POS MACHINES (COMPACT) -->
+    <!-- 2. MADA POS MACHINES -->
     <div class="bg-blue-50/70 p-2.5 rounded-xl border border-blue-300 print-box space-y-2">
       <div class="flex justify-between items-center">
         <span class="font-black text-blue-950 text-xs">💳 മദാ കാർഡ് മെഷീനുകൾ (Mada POS LDR):</span>
@@ -130,7 +134,6 @@
       </div>
 
       <div id="madaMachinesList" class="space-y-1.5">
-        <!-- Dynamic Machines -->
       </div>
 
       <div class="flex justify-between items-center pt-1.5 border-t border-blue-200 text-xs font-black text-blue-950">
@@ -139,11 +142,10 @@
       </div>
     </div>
 
-    <!-- 3. EXPENSES (COMPACT TABLE & QUICK ADD) -->
+    <!-- 3. EXPENSES -->
     <div class="bg-amber-50/70 p-2.5 rounded-xl border border-amber-300 print-box space-y-2">
       <span class="font-black text-amber-950 text-xs block">⚡ പെട്ടിയിൽ നിന്നുള്ള ചിലവുകൾ / പർച്ചേസ് (Expenses):</span>
 
-      <!-- Quick Add Input (No-Print) -->
       <div class="no-print bg-white p-2 rounded-lg border border-amber-300 flex gap-2 items-center">
         <input 
           type="text" 
@@ -165,7 +167,6 @@
         </button>
       </div>
 
-      <!-- Compact Expenses Table -->
       <table class="w-full text-left border-collapse print-table bg-white rounded-lg overflow-hidden border border-amber-200">
         <thead>
           <tr class="bg-amber-100 text-amber-950 font-black text-[11px] border-b">
@@ -176,7 +177,6 @@
           </tr>
         </thead>
         <tbody id="expensesTableBody" class="font-bold text-[11px] divide-y divide-slate-100">
-          <!-- Dynamic Rows -->
         </tbody>
         <tfoot>
           <tr class="font-black text-[11px] bg-amber-100/70 border-t">
@@ -188,7 +188,7 @@
       </table>
     </div>
 
-    <!-- 4. FINAL CLOSING SUMMARY (COMPACT & BOLD - NO CURRENCY SYMBOL) -->
+    <!-- 4. FINAL SUMMARY -->
     <div class="bg-slate-900 text-white p-3 sm:p-4 rounded-xl space-y-2 print-box border border-slate-950">
       <div class="flex justify-between items-center text-emerald-400 border-b border-slate-800 pb-1 text-xs">
         <span class="font-bold">1. ടോട്ടൽ ക്യാഷ് സെയിൽ (Cash + Expenses):</span>
@@ -206,7 +206,7 @@
       </div>
     </div>
 
-    <!-- SIGNATURES (A4 PRINT FOOTER) -->
+    <!-- SIGNATURES -->
     <div class="pt-6 border-t border-slate-800 justify-between items-end text-[11px] font-black hidden print:flex">
       <div class="text-center">
         ...................................................<br>ക്യാഷ്യറുടെ ഒപ്പ്
@@ -216,7 +216,7 @@
       </div>
     </div>
 
-    <!-- BOTTOM ACTION BUTTONS (NO-PRINT) -->
+    <!-- ACTION BUTTONS -->
     <div class="no-print flex flex-wrap gap-2 justify-center pt-2 border-t border-slate-200">
       <button onclick="window.print()" class="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-xs rounded-xl shadow transition flex items-center gap-1.5 cursor-pointer">
         <i data-lucide="printer" class="w-3.5 h-3.5"></i> 🖨️ A4 പ്രിന്റ്
@@ -234,6 +234,38 @@
   </div>
 
   <script>
+    // ==========================================
+    // PWA REGISTRATION & INSTALL LOGIC
+    // ==========================================
+    var deferredPrompt = null;
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      const btn = document.getElementById("pwaInstallBtn");
+      if (btn) btn.classList.remove("hidden");
+    });
+
+    function triggerPwaInstall() {
+      if (!deferredPrompt) return alert("ആപ്പ് ഇതിനകം ഇൻസ്റ്റാൾ ചെയ്തിട്ടുണ്ട് അല്ലെങ്കിൽ ബ്രൗസർ സപ്പോർട്ട് ചെയ്യുന്നില്ല.");
+      deferredPrompt.prompt();
+      deferredPrompt.userChoice.then((choiceResult) => {
+        if (choiceResult.outcome === 'accepted') {
+          const btn = document.getElementById("pwaInstallBtn");
+          if (btn) btn.classList.add("hidden");
+        }
+        deferredPrompt = null;
+      });
+    }
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('closing-sw.js').catch(err => {
+        console.warn('SW registration failed:', err);
+      });
+    }
+
+    // ==========================================
+    // CORE FUNCTIONS
+    // ==========================================
     function getShopsList() {
       if (window.SHOPS_CONFIG && Array.isArray(window.SHOPS_CONFIG) && window.SHOPS_CONFIG.length > 0) return window.SHOPS_CONFIG;
       if (window.SHOPS && Array.isArray(window.SHOPS) && window.SHOPS.length > 0) return window.SHOPS;
@@ -261,9 +293,6 @@
       expenses: []
     };
 
-    // ==========================================
-    // LOGIN VERIFICATION
-    // ==========================================
     function verifyLogin() {
       const pinInput = document.getElementById("loginPinInput");
       const enteredPin = String(pinInput.value || '').trim();
@@ -324,9 +353,6 @@
       checkLoginState();
     }
 
-    // ==========================================
-    // MULTI-SHOP INITIALIZATION
-    // ==========================================
     function initShops() {
       const shops = getShopsList();
       const sel = document.getElementById("shopSelector");
@@ -339,7 +365,6 @@
         sel.classList.remove("hidden");
         badge.classList.add("hidden");
       } else if (userRole === 'admin') {
-        // Master PIN: Can choose any shop from dropdown
         sel.classList.remove("hidden");
         badge.classList.add("hidden");
         shops.forEach(s => {
@@ -352,7 +377,6 @@
         sel.value = savedShopId;
         currentShop = shops.find(s => s.id === sel.value) || shops[0];
       } else {
-        // Specific Shop PIN: Locked to this shop only
         const activeShopId = sessionStorage.getItem("ALNASSR_CLOSING_SHOP_ID");
         currentShop = shops.find(s => s.id === activeShopId) || shops[0];
         sel.classList.add("hidden");
@@ -384,9 +408,6 @@
       }
     }
 
-    // ==========================================
-    // DATA PERSISTENCE (LOCALSTORAGE)
-    // ==========================================
     function loadData() {
       const shopId = currentShop ? currentShop.id : 'default';
       const saved = localStorage.getItem(`ALNASSR_${shopId}_CLOSING`);
@@ -418,9 +439,6 @@
       localStorage.setItem(`ALNASSR_${shopId}_CLOSING`, JSON.stringify(closingState));
     }
 
-    // ==========================================
-    // MADA POS
-    // ==========================================
     function renderMadaMachines() {
       const container = document.getElementById("madaMachinesList");
       container.innerHTML = "";
@@ -451,9 +469,6 @@
       saveData();
     }
 
-    // ==========================================
-    // EXPENSES
-    // ==========================================
     function renderExpensesTable() {
       const tbody = document.getElementById("expensesTableBody");
       tbody.innerHTML = "";
@@ -497,9 +512,6 @@
       saveData();
     }
 
-    // ==========================================
-    // TOTALS (NO CURRENCY SYMBOLS)
-    // ==========================================
     function calculateTotals() {
       const counterCash = parseFloat(document.getElementById("counterCash").value) || 0;
       let totalMada = 0;
@@ -519,9 +531,6 @@
       document.getElementById("finalGrandSale").innerText = grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 });
     }
 
-    // ==========================================
-    // WHATSAPP (NO CURRENCY SYMBOLS)
-    // ==========================================
     function shareWhatsApp() {
       const dt = document.getElementById("closingDate").value;
       const shopName = currentShop ? currentShop.name.toUpperCase() : "ALNASSR";
@@ -561,9 +570,6 @@
       window.open('https://api.whatsapp.com/send?text=' + encodeURIComponent(text), '_blank');
     }
 
-    // ==========================================
-    // RESET NEW DAY
-    // ==========================================
     function resetDayData() {
       if (!confirm("പുതിയ ദിവസത്തെ കണക്കുകൾ തുടങ്ങാൻ ഈ ഷോപ്പിലെ വിവരങ്ങൾ ക്ലിയർ ചെയ്യണമോ?")) return;
       const shopId = currentShop ? currentShop.id : 'default';
