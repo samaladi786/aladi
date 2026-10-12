@@ -151,7 +151,7 @@
       </div>
     </div>
 
-    <!-- 2. MANAGER CASH TRANSACTIONS (CLOSING ONLY - NOT SENT TO MAIN LEDGER) -->
+    <!-- 2. MANAGER CASH TRANSACTIONS (CLOSING ONLY) -->
     <div class="bg-purple-50/70 p-3 sm:p-3.5 rounded-2xl border-2 border-purple-300 print-box space-y-2">
       <span class="font-black text-purple-950 text-xs sm:text-sm block">👔 മാനേജർ ക്യാഷ് ഇടപാടുകൾ (Drawer Handover / Float):</span>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -222,7 +222,7 @@
               autocomplete="off"
             />
             <!-- Dropdown Options Popup -->
-            <div id="partySuggestions" class="absolute left-0 right-0 top-full mt-1 bg-white border-2 border-slate-300 rounded-xl shadow-xl max-h-56 overflow-y-auto z-50 hidden divide-y divide-slate-100"></div>
+            <div id="partySuggestions" class="absolute left-0 right-0 top-full mt-1 bg-white border-2 border-slate-300 rounded-xl shadow-xl max-h-60 overflow-y-auto z-50 hidden divide-y divide-slate-100"></div>
           </div>
 
           <!-- Amount Input -->
@@ -506,7 +506,9 @@
       loadDateData();
     }
 
-    // FETCH VENDORS, EMPLOYEES & EXPENSES WITH BALANCES
+    // =========================================================================
+    // ACCURATE TENURE PAYROLL & VENDOR BALANCE FETCH
+    // =========================================================================
     async function fetchMasterPartiesWithBalances() {
       masterPartyCache = [];
       if (!supabaseClient) return;
@@ -524,10 +526,12 @@
         const expenses = expRes.data || [];
         const transactions = txRes.data || [];
 
-        // 1. Vendors Due Calculation
+        // 1. Vendors (Cash vs Credit)
         vendors.forEach(v => {
-          let due = parseFloat(v.opening_balance) || 0;
           const vName = (v.name || '').trim().toUpperCase();
+          const vType = (v.type || 'credit').toLowerCase(); // 'credit' or 'cash'
+          let due = parseFloat(v.opening_balance) || 0;
+
           transactions.forEach(t => {
             if (t && t.type === 'purchase' && (t.party_name || '').trim().toUpperCase() === vName) {
               const cr = parseFloat(t.credit_amount) || 0;
@@ -536,31 +540,52 @@
               due += (cr - ca - ba);
             }
           });
+
           masterPartyCache.push({
             name: vName,
             type: 'vendor',
-            label: `[VENDOR] ${vName}`,
-            due: Math.max(0, due)
+            vendorType: vType,
+            label: `[VENDOR] ${vName} (${vType === 'cash' ? 'CASH' : 'CREDIT'})`,
+            due: vType === 'cash' ? 0 : Math.max(0, due)
           });
         });
 
-        // 2. Employees Pending Salary Calculation
+        // 2. Employees: Accurate Join Date Tenure Payroll Logic
+        const curClosingDate = new Date(document.getElementById("closingDate").value || getSaudiBusinessDate());
         employees.forEach(em => {
           if (em.status === 'stopped') return;
           const emName = (em.name || '').trim().toUpperCase();
-          let due = parseFloat(em.monthly_salary) || 0;
+          const monthlySalary = parseFloat(em.monthly_salary) || 0;
+          const openingBal = parseFloat(em.opening_balance) || 0;
+
+          let accruedSalary = 0;
+          if (em.join_date) {
+            const join = new Date(em.join_date);
+            let months = (curClosingDate.getFullYear() - join.getFullYear()) * 12 + (curClosingDate.getMonth() - join.getMonth());
+            if (curClosingDate.getDate() >= join.getDate()) {
+              months += 1;
+            }
+            months = Math.max(0, months);
+            accruedSalary = months * monthlySalary;
+          } else {
+            accruedSalary = monthlySalary;
+          }
+
           let paid = 0;
           transactions.forEach(t => {
             if (t && t.type === 'salary' && (t.party_name || '').toUpperCase().includes(emName)) {
               paid += (Math.abs(parseFloat(t.cash_amount) || 0) + Math.abs(parseFloat(t.bank_amount) || 0));
             }
           });
-          due = Math.max(0, due - paid);
+
+          // Net Balance: (Opening Balance + Accrued Salary) - Total Paid
+          const netBalance = (openingBal + accruedSalary) - paid;
+
           masterPartyCache.push({
             name: emName,
             type: 'employee',
             label: `[STAFF] ${emName}`,
-            due: due
+            due: netBalance
           });
         });
 
@@ -600,36 +625,52 @@
 
       const filtered = masterPartyCache.filter(p => p.name.includes(q) || p.label.includes(q));
 
+      // 1. Existing matched list
       filtered.slice(0, 15).forEach(p => {
         const item = document.createElement("div");
         item.className = "p-2.5 px-3 hover:bg-slate-100 cursor-pointer flex justify-between items-center text-xs font-bold";
         item.innerHTML = `
           <span class="text-slate-900">${p.label}</span>
-          <span class="text-[11px] font-mono text-rose-700 font-black">ബാക്കി: ${p.due.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+          <span class="text-[11px] font-mono ${p.due < 0 ? 'text-amber-700' : 'text-rose-700'} font-black">
+            ${p.due < 0 ? 'അഡ്വാൻസ്: ' + Math.abs(p.due).toLocaleString('en-IN', { minimumFractionDigits: 2 }) : 'ബാക്കി: ' + p.due.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+          </span>
         `;
         item.onmousedown = () => selectParty(p);
         popup.appendChild(item);
       });
 
+      // 2. Options to add new if query is not in master list
       if (q.length > 0) {
         const hasExactMatch = masterPartyCache.some(p => p.name === q);
         if (!hasExactMatch) {
-          const addVendOption = document.createElement("div");
-          addVendOption.className = "p-2.5 px-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-950 font-black cursor-pointer flex justify-between items-center text-xs border-t border-emerald-200";
-          addVendOption.innerHTML = `
-            <span>📦 "${q}" - പുതിയ വെണ്ടർ പർച്ചേസ് ആയി ചേർക്കുക</span>
-            <span class="text-[10px] bg-emerald-200 text-emerald-900 px-2 py-0.5 rounded">പുതിയ വെണ്ടർ</span>
+          // Option A: Add as Direct Cash Vendor (Purchases: Roti, Milk, Veg, etc.)
+          const addCashVendOption = document.createElement("div");
+          addCashVendOption.className = "p-2.5 px-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-950 font-black cursor-pointer flex justify-between items-center text-xs border-t border-emerald-200";
+          addCashVendOption.innerHTML = `
+            <span>📦 "${q}" - [CASH VENDOR] ക്യാഷ് പർച്ചേസ്</span>
+            <span class="text-[10px] bg-emerald-200 text-emerald-900 px-2 py-0.5 rounded">ക്യാഷ് പർച്ചേസ്</span>
           `;
-          addVendOption.onmousedown = () => selectParty({ name: q, type: 'vendor', label: `[VENDOR] ${q}`, due: 0, isNew: true });
-          popup.appendChild(addVendOption);
+          addCashVendOption.onmousedown = () => selectParty({ name: q, type: 'vendor', vendorType: 'cash', label: `[VENDOR] ${q} (CASH)`, due: 0, isNewVendor: true });
+          popup.appendChild(addCashVendOption);
 
+          // Option B: Add as Credit Vendor
+          const addCreditVendOption = document.createElement("div");
+          addCreditVendOption.className = "p-2.5 px-3 bg-blue-50 hover:bg-blue-100 text-blue-950 font-black cursor-pointer flex justify-between items-center text-xs border-t border-blue-200";
+          addCreditVendOption.innerHTML = `
+            <span>📋 "${q}" - [CREDIT VENDOR] കുടിശ്ശിക വെണ്ടർ</span>
+            <span class="text-[10px] bg-blue-200 text-blue-900 px-2 py-0.5 rounded">ക്രെഡിറ്റ്</span>
+          `;
+          addCreditVendOption.onmousedown = () => selectParty({ name: q, type: 'vendor', vendorType: 'credit', label: `[VENDOR] ${q} (CREDIT)`, due: 0, isNewVendor: true });
+          popup.appendChild(addCreditVendOption);
+
+          // Option C: Add as General Expense (Auto added to expenses_master)
           const addExpOption = document.createElement("div");
           addExpOption.className = "p-2.5 px-3 bg-amber-50 hover:bg-amber-100 text-amber-950 font-black cursor-pointer flex justify-between items-center text-xs border-t border-amber-200";
           addExpOption.innerHTML = `
-            <span>⚡ "${q}" - സാധാരണ ചിലവായി ചേർക്കുക</span>
-            <span class="text-[10px] bg-amber-200 text-amber-900 px-2 py-0.5 rounded">ചിലവ്</span>
+            <span>⚡ "${q}" - [EXPENSE] ചിലവായി ചേർക്കുക</span>
+            <span class="text-[10px] bg-amber-200 text-amber-900 px-2 py-0.5 rounded">ചിലവ് മാസ്റ്റർ</span>
           `;
-          addExpOption.onmousedown = () => selectParty({ name: q, type: 'regular_expense', label: `[EXPENSE] ${q}`, due: 0 });
+          addExpOption.onmousedown = () => selectParty({ name: q, type: 'regular_expense', label: `[EXPENSE] ${q}`, due: 0, isNewExpense: true });
           popup.appendChild(addExpOption);
         }
       }
@@ -666,7 +707,7 @@
       document.getElementById("lblCurrentDue").innerText = (selectedPartyObject.due || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 });
 
       const amt = parseFloat(document.getElementById("expAmtInput").value) || 0;
-      const rem = Math.max(0, (selectedPartyObject.due || 0) - amt);
+      const rem = (selectedPartyObject.due || 0) - amt;
       document.getElementById("lblRemainingDue").innerText = rem.toLocaleString('en-IN', { minimumFractionDigits: 2 });
     }
 
@@ -681,6 +722,7 @@
     // DATE CHANGED -> LOAD FROM SUPABASE OR LOCAL
     async function onDateChanged() {
       await loadDateData();
+      fetchMasterPartiesWithBalances();
     }
 
     async function loadDateData() {
@@ -836,17 +878,21 @@
       if (!desc || amt <= 0) return alert("വിവരണം തുകയും നൽകുക!");
 
       const type = selectedPartyObject ? selectedPartyObject.type : 'regular_expense';
+      const vendorType = selectedPartyObject ? (selectedPartyObject.vendorType || 'credit') : 'credit';
       const due = selectedPartyObject ? (selectedPartyObject.due || 0) : 0;
-      const isNew = selectedPartyObject ? !!selectedPartyObject.isNew : false;
-      const rem = Math.max(0, due - amt);
+      const isNewV = selectedPartyObject ? !!selectedPartyObject.isNewVendor : false;
+      const isNewE = selectedPartyObject ? !!selectedPartyObject.isNewExpense : false;
+      const rem = due - amt;
 
       closingState.expenses.push({
         desc: desc,
         amount: amt,
         type: type,
+        vendorType: vendorType,
         initial_due: due,
         remaining_due: rem,
-        isNewVendor: isNew
+        isNewVendor: isNewV,
+        isNewExpense: isNewE
       });
 
       partyInp.value = "";
@@ -950,9 +996,9 @@
       }
     }
 
-    // ==========================================
+    // =========================================================================
     // SUBMIT TO CLOUD & COMPLETE CLEAN SLATE RESET
-    // ==========================================
+    // =========================================================================
     async function submitClosingToCloud() {
       const selectedDate = document.getElementById("closingDate").value;
       const counterCash = parseFloat(document.getElementById("counterCash").value) || 0;
@@ -980,7 +1026,7 @@
       }
 
       try {
-        // 1. Safe auto-create new vendors if any
+        // 1. A. Auto-create new vendors with accurate type ('cash' or 'credit')
         for (const exp of closingState.expenses) {
           if (exp.type === 'vendor' && exp.isNewVendor) {
             try {
@@ -988,12 +1034,26 @@
               if (!vCheck) {
                 await supabaseClient.from('vendors').insert([{
                   name: exp.desc,
-                  type: 'credit',
+                  type: exp.vendorType || 'cash',
                   opening_balance: 0
                 }]);
               }
             } catch (vErr) {
               console.warn("Auto-create vendor note:", vErr);
+            }
+          }
+          // 1. B. Auto-create new expenses in expenses_master table
+          if (exp.type === 'regular_expense' && exp.isNewExpense) {
+            try {
+              const { data: eCheck } = await supabaseClient.from('expenses_master').select('id').eq('name', exp.desc).maybeSingle();
+              if (!eCheck) {
+                await supabaseClient.from('expenses_master').insert([{
+                  name: exp.desc,
+                  opening_balance: 0
+                }]);
+              }
+            } catch (eErr) {
+              console.warn("Auto-create expense note:", eErr);
             }
           }
         }
@@ -1064,23 +1124,37 @@
         // C. Individual Outflow Transactions
         closingState.expenses.forEach(exp => {
           if (exp.type === 'vendor') {
-            batchTx.push({
-              date: selectedDate,
-              type: 'purchase',
-              party_name: exp.desc,
-              cash_amount: -Math.abs(exp.amount),
-              bank_amount: 0,
-              credit_amount: 0,
-              closing_ref: closingRefTag
-            });
+            if (exp.vendorType === 'cash') {
+              // Direct Cash Purchase: Increases Purchases total, but net ledger balance is 0!
+              batchTx.push({
+                date: selectedDate,
+                type: 'purchase',
+                party_name: exp.desc,
+                credit_amount: Math.abs(exp.amount),
+                cash_amount: -Math.abs(exp.amount),
+                bank_amount: 0,
+                closing_ref: closingRefTag
+              });
+            } else {
+              // Credit Vendor Due Payment: Reduces vendor pending balance!
+              batchTx.push({
+                date: selectedDate,
+                type: 'purchase',
+                party_name: exp.desc,
+                credit_amount: 0,
+                cash_amount: -Math.abs(exp.amount),
+                bank_amount: 0,
+                closing_ref: closingRefTag
+              });
+            }
           } else if (exp.type === 'employee') {
             batchTx.push({
               date: selectedDate,
               type: 'salary',
               party_name: `Staff: ${exp.desc}`,
+              credit_amount: 0,
               cash_amount: -Math.abs(exp.amount),
               bank_amount: 0,
-              credit_amount: 0,
               closing_ref: closingRefTag
             });
           } else {
@@ -1088,9 +1162,9 @@
               date: selectedDate,
               type: 'expense',
               party_name: exp.desc,
+              credit_amount: 0,
               cash_amount: -Math.abs(exp.amount),
               bank_amount: 0,
-              credit_amount: 0,
               closing_ref: closingRefTag
             });
           }
@@ -1101,7 +1175,7 @@
           if (txErr) throw txErr;
         }
 
-        // 5. സമ്പൂർണ്ണ ക്ലീൻ സ്ലേറ്റ് (Full Clean Slate Reset)
+        // 5. Complete Clean Slate Reset
         const shopId = currentShop ? currentShop.id : 'default';
         localStorage.removeItem(`ALNASSR_${shopId}_CLOSING_${selectedDate}`);
 
@@ -1114,7 +1188,7 @@
           expenses: []
         };
 
-        // Reset All UI Inputs to Blank
+        // Reset Inputs
         document.getElementById("counterCash").value = "";
         document.getElementById("managerCashOut").value = "";
         document.getElementById("managerCashIn").value = "";
@@ -1126,7 +1200,7 @@
         populateUIFromState();
         fetchMasterPartiesWithBalances();
 
-        alert("🎉 ക്ലോസിംഗ് വിജയകരമായി ക്ലൗഡിൽ പോസ്റ്റ് ചെയ്തു! സ്ക്രീൻ അടുത്ത ദിവസത്തിനായി പൂർണ്ണമായി ക്ലീൻ ചെയ്തു.");
+        alert("🎉 ക്ലോസിംഗ് വിജയകരമായി ക്ലൗഡിൽ പോസ്റ്റ് ചെയ്തു! സ്ക്രീൻ പൂർണ്ണമായി ക്ലീൻ ചെയ്തു.");
 
       } catch (err) {
         alert("സബ്മിറ്റ് പിശക്: " + err.message);
