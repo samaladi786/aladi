@@ -1,4 +1,4 @@
-const CACHE_NAME = 'closing-cache-v13';
+const CACHE_NAME = 'closing-cache-v14';
 const ASSETS = [
   'closing.html',
   'config.js',
