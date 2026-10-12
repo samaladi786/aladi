@@ -1345,7 +1345,7 @@ async function requestRestoreBackup(event) {
       return alert("അഡ്മിൻ മാസ്റ്റർ പിൻ തെറ്റാണ്!");
     }
 
-    if (!confirm("⚠️ മുന്നറിയിപ്പ്: ഈ ബാക്കപ്പ് റീസ്റ്റോർ ചെയ്താൽ നിലവിലുള്ള എല്ലാ ഡാറ്റയും ക്ലൗഡ് ഡാറ്റാബേസിലും ഫോണിലും മാറ്റിയെഴുതപ്പെടും!\n\nതുടരണമെന്ന് ഉറപ്പാണോ?")) {
+    if (!confirm("⚠️ മുന്നറിയിപ്പ്: നിലവിലുള്ള എല്ലാ പഴയ ഡാറ്റയും ക്ലൗഡിൽ നിന്നും ഫോണിൽ നിന്നും പൂർണ്ണമായി മായ്ച്ച്, ഈ ബാക്കപ്പ് ഫയലിലുള്ള വിവരങ്ങൾ മാത്രം റീസ്റ്റോർ ചെയ്യപ്പെടും!\n\nതുടരണമെന്ന് ഉറപ്പാണോ?")) {
       event.target.value = "";
       return;
     }
@@ -1358,7 +1358,7 @@ async function requestRestoreBackup(event) {
           return alert("അസാധുവായ ബാക്കപ്പ് ഫയൽ!");
         }
 
-        // 1. ഫോൺ മെമ്മറി സെറ്റ് ചെയ്യുന്നു
+        // 1. ഫോൺ മെമ്മറി പൂർണ്ണമായി ഫ്രഷ് ആക്കുന്നു
         customersList = backupData.customers || [];
         vendorsList = backupData.vendors || [];
         employeesList = backupData.employees || [];
@@ -1367,11 +1367,26 @@ async function requestRestoreBackup(event) {
         transactionsList = backupData.transactions || [];
         if (backupData.opening_settings) openingSettings = backupData.opening_settings;
 
-        // 2. ക്ലൗഡ് ഡാറ്റാബേസിലേക്ക് (SUPABASE) INSERT ചെയ്യുന്നു
-        if (navigator.onLine && supabaseClient) {
-          alert("ക്ലൗഡ് ഡാറ്റാബേസിലേക്ക് ഡാറ്റ അപ്‌ലോഡ് ചെയ്യുന്നു. അല്പം കാത്തിരിക്കുക...");
+        localStorage.setItem(`ALNASSR_${currentShopId}_CUSTOMERS`, JSON.stringify(customersList));
+        localStorage.setItem(`ALNASSR_${currentShopId}_VENDORS`, JSON.stringify(vendorsList));
+        localStorage.setItem(`ALNASSR_${currentShopId}_EMPLOYEES`, JSON.stringify(employeesList));
+        localStorage.setItem(`ALNASSR_${currentShopId}_EXPENSES`, JSON.stringify(expensesMasterList));
+        localStorage.setItem(`ALNASSR_${currentShopId}_AGENTS`, JSON.stringify(agentsList));
+        localStorage.setItem(`ALNASSR_${currentShopId}_TRANSACTIONS`, JSON.stringify(transactionsList));
 
-          // A. Settings
+        // 2. ക്ലൗഡ് ഡാറ്റാബേസ് (SUPABASE) റീസെറ്റ് ചെയ്ത് പുതിയത് ഇൻസേർട്ട് ചെയ്യുന്നു
+        if (navigator.onLine && supabaseClient) {
+          alert("ക്ലൗഡിലെ പഴയ വിവരങ്ങൾ ക്ലിയർ ചെയ്ത് പുതിയ ബാക്കപ്പ് അപ്‌ലോഡ് ചെയ്യുന്നു. അല്പം കാത്തിരിക്കുക...");
+
+          // A. പഴയ ഡാറ്റ ക്ലൗഡിൽ നിന്ന് പൂർണ്ണമായി ക്ലിയർ ചെയ്യുന്നു (Clean Slate)
+          await supabaseClient.from('transactions').delete().neq('type', 'DUMMY_CLEAR');
+          await supabaseClient.from('customers').delete().neq('name', 'DUMMY_CLEAR');
+          await supabaseClient.from('vendors').delete().neq('name', 'DUMMY_CLEAR');
+          await supabaseClient.from('employees').delete().neq('name', 'DUMMY_CLEAR');
+          await supabaseClient.from('expenses_master').delete().neq('name', 'DUMMY_CLEAR');
+          await supabaseClient.from('agents').delete().neq('name', 'DUMMY_CLEAR');
+
+          // B. തുടക്ക ഫണ്ട് (Settings)
           if (backupData.opening_settings) {
             try {
               const { data: setRow } = await supabaseClient.from('app_settings').select('*');
@@ -1389,13 +1404,13 @@ async function requestRestoreBackup(event) {
             } catch (errSet) { console.warn("Settings restore:", errSet); }
           }
 
-          // B. Agents
+          // C. റൂട്ട് ഏജന്റുമാർ (Agents)
           if (agentsList.length > 0) {
             const cleanAgents = agentsList.map(a => ({ name: (a.name || '').trim().toUpperCase() }));
             await supabaseClient.from('agents').insert(cleanAgents);
           }
 
-          // C. Customers
+          // D. കസ്റ്റമർമാർ (Customers)
           if (customersList.length > 0) {
             const cleanCust = customersList.map(c => ({
               name: (c.name || '').trim().toUpperCase(),
@@ -1407,7 +1422,7 @@ async function requestRestoreBackup(event) {
             await supabaseClient.from('customers').insert(cleanCust);
           }
 
-          // D. Vendors
+          // E. വെണ്ടർമാർ (Vendors)
           if (vendorsList.length > 0) {
             const cleanVend = vendorsList.map(v => ({
               name: (v.name || '').trim().toUpperCase(),
@@ -1417,7 +1432,7 @@ async function requestRestoreBackup(event) {
             await supabaseClient.from('vendors').insert(cleanVend);
           }
 
-          // E. Employees
+          // F. ജീവനക്കാർ (Employees)
           if (employeesList.length > 0) {
             const cleanEmp = employeesList.map(em => ({
               name: (em.name || '').trim().toUpperCase(),
@@ -1429,7 +1444,7 @@ async function requestRestoreBackup(event) {
             await supabaseClient.from('employees').insert(cleanEmp);
           }
 
-          // F. Expenses Master
+          // G. ചിലവ് ഇനങ്ങൾ (Expenses Master)
           if (expensesMasterList.length > 0) {
             const cleanExp = expensesMasterList.map(ex => ({
               name: (ex.name || '').trim().toUpperCase(),
@@ -1439,7 +1454,7 @@ async function requestRestoreBackup(event) {
             await supabaseClient.from('expenses_master').insert(cleanExp);
           }
 
-          // G. Transactions (100 എണ്ണം വീതം ബാച്ച് ആയി കയറ്റുന്നു)
+          // H. ഇടപാടുകൾ (Transactions)
           if (transactionsList.length > 0) {
             const chunkSize = 100;
             for (let i = 0; i < transactionsList.length; i += chunkSize) {
@@ -1451,7 +1466,7 @@ async function requestRestoreBackup(event) {
             }
           }
 
-          // ക്ലൗഡിൽ നിന്ന് പുതിയ വിവരങ്ങൾ ലോഡ് ചെയ്യുന്നു
+          // ക്ലൗഡിൽ നിന്ന് പുതിയ വിവരങ്ങൾ റീഫ്രഷ് ചെയ്യുന്നു
           if (typeof fetchAllData === 'function') {
             await fetchAllData();
           }
@@ -1459,8 +1474,10 @@ async function requestRestoreBackup(event) {
 
         if (typeof populateDropdowns === 'function') populateDropdowns();
         if (typeof renderQuickTotalsAndRecent === 'function') renderQuickTotalsAndRecent();
+        if (typeof renderActiveMasterList === 'function') renderActiveMasterList();
         if (typeof closeBackupModal === 'function') closeBackupModal();
-        alert("🎉 ക്ലൗഡിലേക്കും ഫോണിലേക്കും വിജയകരമായി ബാക്കപ്പ് റീസ്റ്റോർ ചെയ്തു! ഇനി Ctrl + F5 അടിച്ചാലും ഡാറ്റ പോകില്ല.");
+
+        alert("🎉 ക്ലൗഡിലെ പഴയ വിവരങ്ങൾ പൂർണ്ണമായി ഒഴിവാക്കി, ഫ്രഷ് ബാക്കപ്പ് വിജയകരമായി റീസ്റ്റോർ ചെയ്തു!");
       } catch (errInner) {
         alert("റീസ്റ്റോർ പിശക്: " + errInner.message);
       }
