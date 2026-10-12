@@ -125,7 +125,7 @@ function renderReportData(mode) {
   } else {
     dateCondition = (dStr) => cleanDate(dStr).startsWith(targetMonth);
     isBeforeTargetCondition = (dStr) => cleanDate(dStr) < `${targetMonth}-01`;
-    isTargetOrBeforeCondition = (dStr) => cleanDate(dStr).substring(0, 7) <= targetMonth;
+    isTargetOrBeforeCondition = (dStr) => cleanDate(dStr) < `${targetMonth}-01` || cleanDate(dStr).startsWith(targetMonth);
     titleText = `മന്ത്ലി റിപ്പോർട്ട് (${targetMonth})`;
     dateBadgeText = `മാസം: ${targetMonth}`;
   }
@@ -1299,7 +1299,7 @@ async function uploadMasterExcel(event) {
 }
 
 // ========================================================
-// 6. 1-CLICK FULL BACKUP & RESTORE (WITH COMPLETE CLOUD RESTORE)
+// 6. 1-CLICK FULL BACKUP & RESTORE (GUARANTEED WIPE & CLOUD RESTORE)
 // ========================================================
 function downloadFullBackupJSON() {
   try {
@@ -1333,6 +1333,27 @@ function downloadFullBackupJSON() {
   }
 }
 
+// ക്ലൗഡിലെ ഒരു ടേബിളിലുള്ള മുഴുവൻ ഡാറ്റയും ID വഴി കൃത്യമായി മായ്ക്കുന്ന ഹെൽപ്പർ ഫംഗ്ഷൻ
+async function clearEntireCloudTable(tableName) {
+  if (!supabaseClient) return;
+  try {
+    const { data: rows, error: selErr } = await supabaseClient.from(tableName).select('id');
+    if (selErr) {
+      console.warn(`Could not select IDs from ${tableName}:`, selErr);
+      return;
+    }
+    if (rows && rows.length > 0) {
+      const ids = rows.map(r => r.id).filter(id => id !== undefined && id !== null);
+      for (let i = 0; i < ids.length; i += 100) {
+        const chunk = ids.slice(i, i + 100);
+        await supabaseClient.from(tableName).delete().in('id', chunk);
+      }
+    }
+  } catch (e) {
+    console.warn(`Exception clearing ${tableName}:`, e);
+  }
+}
+
 async function requestRestoreBackup(event) {
   try {
     const file = event.target.files[0];
@@ -1358,7 +1379,7 @@ async function requestRestoreBackup(event) {
           return alert("അസാധുവായ ബാക്കപ്പ് ഫയൽ!");
         }
 
-        // 1. ഫോൺ മെമ്മറി പൂർണ്ണമായി ഫ്രഷ് ആക്കുന്നു
+        // 1. ഫോണിന്റെ താൽക്കാലിക മെമ്മറി പൂർണ്ണമായി ഫ്രഷ് ആക്കുന്നു
         customersList = backupData.customers || [];
         vendorsList = backupData.vendors || [];
         employeesList = backupData.employees || [];
@@ -1374,17 +1395,17 @@ async function requestRestoreBackup(event) {
         localStorage.setItem(`ALNASSR_${currentShopId}_AGENTS`, JSON.stringify(agentsList));
         localStorage.setItem(`ALNASSR_${currentShopId}_TRANSACTIONS`, JSON.stringify(transactionsList));
 
-        // 2. ക്ലൗഡ് ഡാറ്റാബേസ് (SUPABASE) റീസെറ്റ് ചെയ്ത് പുതിയത് ഇൻസേർട്ട് ചെയ്യുന്നു
+        // 2. ക്ലൗഡ് ഡാറ്റാബേസ് (SUPABASE) റീസെറ്റ് ചെയ്ത് ഇൻസേർട്ട് ചെയ്യുന്നു
         if (navigator.onLine && supabaseClient) {
-          alert("ക്ലൗഡിലെ പഴയ വിവരങ്ങൾ ക്ലിയർ ചെയ്ത് പുതിയ ബാക്കപ്പ് അപ്‌ലോഡ് ചെയ്യുന്നു. അല്പം കാത്തിരിക്കുക...");
+          alert("ക്ലൗഡിലെ പഴയ വിവരങ്ങൾ പൂർണ്ണമായി നീക്കം ചെയ്ത് പുതിയ ബാക്കപ്പ് അപ്‌ലോഡ് ചെയ്യുന്നു. അല്പം കാത്തിരിക്കുക...");
 
-          // A. പഴയ ഡാറ്റ ക്ലൗഡിൽ നിന്ന് പൂർണ്ണമായി ക്ലിയർ ചെയ്യുന്നു (Clean Slate)
-          await supabaseClient.from('transactions').delete().neq('type', 'DUMMY_CLEAR');
-          await supabaseClient.from('customers').delete().neq('name', 'DUMMY_CLEAR');
-          await supabaseClient.from('vendors').delete().neq('name', 'DUMMY_CLEAR');
-          await supabaseClient.from('employees').delete().neq('name', 'DUMMY_CLEAR');
-          await supabaseClient.from('expenses_master').delete().neq('name', 'DUMMY_CLEAR');
-          await supabaseClient.from('agents').delete().neq('name', 'DUMMY_CLEAR');
+          // A. ഫോറിൻ കീ പ്രശ്നം ഒഴിവാക്കാൻ കൃത്യമായ ക്രമത്തിൽ ID വഴി മുഴുവൻ പഴയതും മായ്ക്കുന്നു
+          await clearEntireCloudTable('transactions');
+          await clearEntireCloudTable('customers');
+          await clearEntireCloudTable('vendors');
+          await clearEntireCloudTable('employees');
+          await clearEntireCloudTable('expenses_master');
+          await clearEntireCloudTable('agents');
 
           // B. തുടക്ക ഫണ്ട് (Settings)
           if (backupData.opening_settings) {
@@ -1458,15 +1479,19 @@ async function requestRestoreBackup(event) {
           if (transactionsList.length > 0) {
             const chunkSize = 100;
             for (let i = 0; i < transactionsList.length; i += chunkSize) {
-              const chunk = transactionsList.slice(i, i + chunkSize).map(t => {
-                const { id, ...cleanT } = t;
-                return cleanT;
-              });
+              const chunk = transactionsList.slice(i, i + chunkSize).map(t => ({
+                date: cleanDate(t.date) || getSaudiBusinessDate(),
+                type: t.type || 'sale',
+                party_name: t.party_name || '',
+                cash_amount: parseFloat(t.cash_amount) || 0,
+                bank_amount: parseFloat(t.bank_amount) || 0,
+                credit_amount: parseFloat(t.credit_amount) || 0
+              }));
               await supabaseClient.from('transactions').insert(chunk);
             }
           }
 
-          // ക്ലൗഡിൽ നിന്ന് പുതിയ വിവരങ്ങൾ റീഫ്രഷ് ചെയ്യുന്നു
+          // ക്ലൗഡിൽ നിന്ന് പുതിയ വിവരങ്ങൾ പുനഃക്രമീകരിക്കുന്നു
           if (typeof fetchAllData === 'function') {
             await fetchAllData();
           }
@@ -1477,7 +1502,7 @@ async function requestRestoreBackup(event) {
         if (typeof renderActiveMasterList === 'function') renderActiveMasterList();
         if (typeof closeBackupModal === 'function') closeBackupModal();
 
-        alert("🎉 ക്ലൗഡിലെ പഴയ വിവരങ്ങൾ പൂർണ്ണമായി ഒഴിവാക്കി, ഫ്രഷ് ബാക്കപ്പ് വിജയകരമായി റീസ്റ്റോർ ചെയ്തു!");
+        alert("🎉 ക്ലൗഡിലെ മുഴുവൻ പഴയ വിവരങ്ങളും മായ്ച്ചു കളഞ്ഞ്, പുതിയ ബാക്കപ്പ് വിജയകരമായി റീസ്റ്റോർ ചെയ്തു!");
       } catch (errInner) {
         alert("റീസ്റ്റോർ പിശക്: " + errInner.message);
       }
