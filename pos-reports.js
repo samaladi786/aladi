@@ -100,7 +100,7 @@ function onReportMonthChanged() { renderReportData('monthly'); }
 function formatShortName(name) {
   if (!name) return '';
   let s = String(name).trim();
-  return s.length > 25 ? s.substring(0, 24) + '..' : s;
+  return s.length > 17 ? s.substring(0, 16) + '..' : s;
 }
 
 // ========================================================
@@ -422,7 +422,7 @@ function renderReportData(mode) {
 }
 
 // ========================================================
-// 3. STATEMENTS ENGINE (SELECT DROPDOWN + DATE-WISE MERGE)
+// 3. STATEMENTS ENGINE (SELECT DROPDOWN POPULATION)
 // ========================================================
 var rawStatementPartyList = [];
 
@@ -545,50 +545,43 @@ function generateStatement() {
   let singleAgentCustomersSummary = [];
   let utilitiesConsolidatedSummary = [];
 
-  // 1. CUSTOMERS STATEMENT (DATE-WISE MERGED INTO SINGLE ROW)
+  // 1. CUSTOMERS STATEMENT
   if (type === 'customer' && !isAllCustomersMode) {
     const custClean = cleanPartyName(partyVal);
     const cust = customersList.find(c => c && cleanPartyName(c.name) === custClean);
     partyName = cust ? cust.name.toUpperCase() : partyVal;
     openingBal = parseFloat(cust?.opening_balance) || 0;
 
-    let dailyMap = {};
-
     allTx.forEach(t => {
       let tDate = cleanDate(t.date);
       if (t && cleanPartyName(t.party_name) === custClean && t.type === 'sale') {
-        const debit = parseFloat(t.credit_amount) || 0;
-        const credit = (parseFloat(t.cash_amount) || 0) + (parseFloat(t.bank_amount) || 0);
-
         if (tDate < fromDate) {
-          openingBal += (debit - credit);
-        } else if (tDate >= fromDate && tDate <= toDate) {
-          totalSalesOrBills += debit;
-          totalPaidOrCollected += credit;
-
-          if (!dailyMap[tDate]) {
-            dailyMap[tDate] = { date: tDate, paid: 0, bill: 0, types: [] };
-          }
-          dailyMap[tDate].paid += credit;
-          dailyMap[tDate].bill += debit;
-          if (debit > 0 && !dailyMap[tDate].types.includes("Credit Sale Bill")) dailyMap[tDate].types.push("Credit Sale Bill");
-          if (credit > 0 && !dailyMap[tDate].types.includes("Collection Receipt")) dailyMap[tDate].types.push("Collection Receipt");
+          openingBal += (parseFloat(t.credit_amount) || 0) - (parseFloat(t.cash_amount) || 0) - (parseFloat(t.bank_amount) || 0);
         }
       }
     });
 
     runningBal = openingBal;
-    Object.keys(dailyMap).sort().forEach(dt => {
-      const item = dailyMap[dt];
-      runningBal += (item.bill - item.paid);
-      statementRows.push({
-        date: dt,
-        desc: item.types.join(" & ") || "Sale Transaction",
-        cash: item.paid,
-        bank: 0,
-        bill: item.bill,
-        bal: runningBal
-      });
+    allTx.forEach(t => {
+      let tDate = cleanDate(t.date);
+      if (t && cleanPartyName(t.party_name) === custClean && t.type === 'sale') {
+        if (tDate >= fromDate && tDate <= toDate) {
+          const debit = parseFloat(t.credit_amount) || 0;
+          const credit = (parseFloat(t.cash_amount) || 0) + (parseFloat(t.bank_amount) || 0);
+          totalSalesOrBills += debit;
+          totalPaidOrCollected += credit;
+          runningBal += debit - credit;
+
+          statementRows.push({
+            date: tDate,
+            desc: debit > 0 ? 'Credit Sale Bill' : 'Collection Receipt',
+            cash: parseFloat(t.cash_amount) || 0,
+            bank: parseFloat(t.bank_amount) || 0,
+            bill: debit,
+            bal: runningBal
+          });
+        }
+      }
     });
   } else if (isAllCustomersMode) {
     partyName = `TOTAL CREDIT CUSTOMERS MONTHLY STATEMENT`;
@@ -625,50 +618,31 @@ function generateStatement() {
     openingBal = totalCustOpening; totalSalesOrBills = totalCustSales; totalPaidOrCollected = totalCustPaid; runningBal = totalCustClosing;
   }
 
-  // 2. VENDORS STATEMENT (DATE-WISE MERGED INTO SINGLE ROW)
+  // 2. VENDORS STATEMENT
   else if (type === 'vendor' && !isAllVendorsMode) {
     const vendClean = cleanPartyName(partyVal);
     const vend = vendorsList.find(v => v && cleanPartyName(v.name) === vendClean);
     partyName = vend ? vend.name.toUpperCase() : partyVal;
     openingBal = parseFloat(vend?.opening_balance) || 0;
 
-    let dailyMap = {};
-
     allTx.forEach(t => {
       let tDate = cleanDate(t.date);
       if (t && cleanPartyName(t.party_name) === vendClean && t.type === 'purchase') {
-        const debit = parseFloat(t.credit_amount) || 0;
-        const paid = Math.abs(parseFloat(t.cash_amount) || 0) + Math.abs(parseFloat(t.bank_amount) || 0);
-
-        if (tDate < fromDate) {
-          openingBal += (debit - paid);
-        } else if (tDate >= fromDate && tDate <= toDate) {
-          totalSalesOrBills += debit;
-          totalPaidOrCollected += paid;
-
-          if (!dailyMap[tDate]) {
-            dailyMap[tDate] = { date: tDate, paid: 0, bill: 0, types: [] };
-          }
-          dailyMap[tDate].paid += paid;
-          dailyMap[tDate].bill += debit;
-          if (debit > 0 && !dailyMap[tDate].types.includes("Credit Purchase")) dailyMap[tDate].types.push("Credit Purchase");
-          if (paid > 0 && !dailyMap[tDate].types.includes("Payment Disbursed")) dailyMap[tDate].types.push("Payment Disbursed");
-        }
+        if (tDate < fromDate) openingBal += (parseFloat(t.credit_amount) || 0) - Math.abs(parseFloat(t.cash_amount) || 0) - Math.abs(parseFloat(t.bank_amount) || 0);
       }
     });
 
     runningBal = openingBal;
-    Object.keys(dailyMap).sort().forEach(dt => {
-      const item = dailyMap[dt];
-      runningBal += (item.bill - item.paid);
-      statementRows.push({
-        date: dt,
-        desc: item.types.join(" & ") || "Purchase Transaction",
-        cash: item.paid,
-        bank: 0,
-        bill: item.bill,
-        bal: runningBal
-      });
+    allTx.forEach(t => {
+      let tDate = cleanDate(t.date);
+      if (t && cleanPartyName(t.party_name) === vendClean && t.type === 'purchase') {
+        if (tDate >= fromDate && tDate <= toDate) {
+          const debit = parseFloat(t.credit_amount) || 0;
+          const paid = Math.abs(parseFloat(t.cash_amount) || 0) + Math.abs(parseFloat(t.bank_amount) || 0);
+          totalSalesOrBills += debit; totalPaidOrCollected += paid; runningBal += debit - paid;
+          statementRows.push({ date: tDate, desc: debit > 0 ? 'Credit Purchase' : 'Payment Disbursed', cash: Math.abs(parseFloat(t.cash_amount) || 0), bank: Math.abs(parseFloat(t.bank_amount) || 0), bill: debit, bal: runningBal });
+        }
+      }
     });
   } else if (isAllVendorsMode) {
     partyName = `TOTAL VENDORS MONTHLY STATEMENT`;
@@ -1092,9 +1066,9 @@ function generateStatement() {
       tableHtml += `<tr><td colspan="5" class="p-4 text-center text-slate-400 font-bold">ഈ മാസത്തിൽ ഇടപാടുകൾ ഒന്നും ഇല്ല</td></tr>`;
     } else {
       statementRows.forEach(r => {
-        let payStr = (r.cash + r.bank > 0) ? `${(r.cash + r.bank).toLocaleString('en-IN')}` : '-';
-        let billStr = (r.bill > 0) ? `${r.bill.toLocaleString('en-IN')}` : '-';
-        tableHtml += `<tr class="text-center hover:bg-slate-50"><td class="p-1 text-left text-slate-600">${r.date}</td><td class="p-1 text-left truncate" title="${r.desc}">${formatShortName(r.desc)}</td><td class="p-1 text-emerald-700 font-black">${payStr}</td><td class="p-1 text-amber-700 font-black">${billStr}</td><td class="p-1 font-black text-slate-950">${r.bal.toLocaleString('en-IN')}</td></tr>`;
+        let payStr = (r.cash + r.bank > 0) ? `${r.cash + r.bank}` : '-';
+        let billStr = (r.bill > 0) ? `${r.bill}` : '-';
+        tableHtml += `<tr class="text-center hover:bg-slate-50"><td class="p-1 text-left text-slate-600">${r.date}</td><td class="p-1 text-left truncate">${formatShortName(r.desc)}</td><td class="p-1 text-emerald-700">${payStr}</td><td class="p-1 text-amber-700">${billStr}</td><td class="p-1 font-black">${r.bal.toLocaleString('en-IN')}</td></tr>`;
       });
     }
     tableHtml += `</tbody></table>`;
@@ -1112,4 +1086,312 @@ function generateStatement() {
     totalPaid: totalPaidOrCollected,
     closingBal: runningBal
   };
+}
+
+// ========================================================
+// 4. WHATSAPP SHARING LOGIC
+// ========================================================
+function shareActiveReportWhatsApp() {
+  if (currentReportMode === 'statement') {
+    if (!currentStatementDataForWA) return alert("Generate statement before sharing!");
+    const d = currentStatementDataForWA;
+    let waText = `📊 *${((currentShop && currentShop.name) ? currentShop.name : "ALNASSR").toUpperCase()} - ACCOUNT STATEMENT*\n` +
+                 `👤 *Account:* ${d.partyName}\n` +
+                 `📅 *Month:* ${d.month}\n` +
+                 `--------------------------------\n` +
+                 `🔹 *Opening Balance:* ${d.openingBal}\n` +
+                 `🛒 *Total Bills/Sales:* ${d.totalSales}\n` +
+                 `💵 *Total Payments:* ${d.totalPaid}\n` +
+                 `🔴 *Closing Balance Due:* ${d.closingBal}\n`;
+    window.open('https://api.whatsapp.com/send?text=' + encodeURIComponent(waText), '_blank');
+  } else {
+    let d = currentReportDataForWA;
+    let waText = `📊 *${d.shopName} - ${d.title}*\n` +
+                 `📅 ${d.dateLabel}\n` +
+                 `--------------------------------\n` +
+                 `🛒 *ആകെ സെയിൽസ്:* ${d.sale}\n` +
+                 `🚚 *ആകെ പർച്ചേസ്:* ${d.purchase}\n` +
+                 `⚡ *ആകെ ചിലവുകൾ:* ${d.expense}\n` +
+                 `--------------------------------\n` +
+                 `📋 *15% വാറ്റ് സമ്മറി (VAT):*\n` +
+                 `  🔺 സെയിൽസ് വാറ്റ് (Output): ${d.vatOutput} SR\n` +
+                 `  🔻 പർച്ചേസ് വാറ്റ് (Input): ${d.vatInput} SR\n` +
+                 `  🔹 അടയ്ക്കാനുള്ള വാറ്റ്: ${d.vatNet} SR\n` +
+                 `--------------------------------\n` +
+                 `💵 *ലിക്വിഡ് ഫണ്ട്:* Cash: ${d.cash} | Bank: ${d.bank}\n` +
+                 `--------------------------------\n` +
+                 `📌 *ബാക്കികൾ:* കസ്റ്റമർ: ${d.custBal} | വെണ്ടർ: ${d.vendorBal} | സ്റ്റാഫ്: ${d.empBal}`;
+    window.open('https://api.whatsapp.com/send?text=' + encodeURIComponent(waText), '_blank');
+  }
+}
+
+// ========================================================
+// 5. BULK EXCEL IMPORT & EXPORT (SheetJS)
+// ========================================================
+function downloadMasterExcel() {
+  try {
+    if (typeof XLSX === 'undefined') return alert("Excel ലൈബ്രറി ലോഡ് ആയിട്ടില്ല!");
+
+    const wb = XLSX.utils.book_new();
+
+    const custData = customersList.map(c => ({
+      "Name": c.name,
+      "Type": c.type || 'credit',
+      "Agent": getCustomerAgentName(c),
+      "Opening_Balance": c.opening_balance || 0,
+      "Credit_Limit": c.credit_limit || 0
+    }));
+    const wsCust = XLSX.utils.json_to_sheet(custData);
+    XLSX.utils.book_append_sheet(wb, wsCust, "Customers");
+
+    const vendData = vendorsList.map(v => ({
+      "Name": v.name,
+      "Type": v.type || 'credit',
+      "Opening_Balance": v.opening_balance || 0
+    }));
+    const wsVend = XLSX.utils.json_to_sheet(vendData);
+    XLSX.utils.book_append_sheet(wb, wsVend, "Vendors");
+
+    const empData = employeesList.map(e => ({
+      "Name": e.name,
+      "Monthly_Salary": e.monthly_salary || 0,
+      "Joining_Date": e.joining_date || '',
+      "Opening_Advance": e.opening_advance || e.opening_balance || 0,
+      "Status": e.status || 'active'
+    }));
+    const wsEmp = XLSX.utils.json_to_sheet(empData);
+    XLSX.utils.book_append_sheet(wb, wsEmp, "Employees");
+
+    const expData = expensesMasterList.map(ex => ({
+      "Name": ex.name,
+      "Type": ex.type || 'regular',
+      "Opening_Balance": ex.opening_balance || 0
+    }));
+    const wsExp = XLSX.utils.json_to_sheet(expData);
+    XLSX.utils.book_append_sheet(wb, wsExp, "Expenses");
+
+    const fileName = `ALNASSR_Master_Data_${currentShopId || 'POS'}.xlsx`;
+    XLSX.writeFile(wb, fileName);
+  } catch (err) {
+    alert("Excel Export Error: " + err.message);
+  }
+}
+
+async function uploadMasterExcel(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const enteredPin = prompt("എക്സൽ വഴി ഡാറ്റ കയറ്റാൻ അഡ്മിൻ മാസ്റ്റർ പിൻ നൽകുക:");
+  const masterPin = getMasterPin();
+  if (enteredPin !== masterPin) {
+    event.target.value = "";
+    return alert("അഡ്മിൻ മാസ്റ്റർ പിൻ തെറ്റാണ്!");
+  }
+
+  const reader = new FileReader();
+  reader.onload = async function (e) {
+    try {
+      const data = new Uint8Array(e.target.result);
+      const workbook = XLSX.read(data, { type: 'array' });
+
+      if (workbook.Sheets["Customers"]) {
+        const rows = XLSX.utils.sheet_to_json(workbook.Sheets["Customers"]);
+        for (const r of rows) {
+          if (!r.Name) continue;
+          const name = String(r.Name).trim().toUpperCase();
+          const payload = {
+            name: name,
+            type: String(r.Type || 'credit').toLowerCase(),
+            agent_name: String(r.Agent || '').trim().toUpperCase(),
+            opening_balance: parseFloat(r.Opening_Balance) || 0,
+            credit_limit: parseFloat(r.Credit_Limit) || 0
+          };
+          let existing = customersList.find(c => c.name.toUpperCase() === name);
+          if (existing) {
+            Object.assign(existing, payload);
+            if (navigator.onLine && supabaseClient && existing.id) await supabaseClient.from('customers').update(payload).eq('id', existing.id);
+          } else {
+            customersList.push(payload);
+            if (navigator.onLine && supabaseClient) await supabaseClient.from('customers').insert([payload]);
+          }
+        }
+      }
+
+      if (workbook.Sheets["Vendors"]) {
+        const rows = XLSX.utils.sheet_to_json(workbook.Sheets["Vendors"]);
+        for (const r of rows) {
+          if (!r.Name) continue;
+          const name = String(r.Name).trim().toUpperCase();
+          const payload = {
+            name: name,
+            type: String(r.Type || 'credit').toLowerCase(),
+            opening_balance: parseFloat(r.Opening_Balance) || 0
+          };
+          let existing = vendorsList.find(v => v.name.toUpperCase() === name);
+          if (existing) {
+            Object.assign(existing, payload);
+            if (navigator.onLine && supabaseClient && existing.id) await supabaseClient.from('vendors').update(payload).eq('id', existing.id);
+          } else {
+            vendorsList.push(payload);
+            if (navigator.onLine && supabaseClient) await supabaseClient.from('vendors').insert([payload]);
+          }
+        }
+      }
+
+      if (workbook.Sheets["Employees"]) {
+        const rows = XLSX.utils.sheet_to_json(workbook.Sheets["Employees"]);
+        for (const r of rows) {
+          if (!r.Name) continue;
+          const name = String(r.Name).trim().toUpperCase();
+          const payload = {
+            name: name,
+            monthly_salary: parseFloat(r.Monthly_Salary) || 0,
+            joining_date: r.Joining_Date ? String(r.Joining_Date) : getSaudiBusinessDate(),
+            opening_advance: parseFloat(r.Opening_Advance) || 0,
+            status: r.Status ? String(r.Status).toLowerCase() : 'active'
+          };
+          let existing = employeesList.find(emp => emp.name.toUpperCase() === name);
+          if (existing) {
+            Object.assign(existing, payload);
+            if (navigator.onLine && supabaseClient && existing.id) await supabaseClient.from('employees').update(payload).eq('id', existing.id);
+          } else {
+            employeesList.push(payload);
+            if (navigator.onLine && supabaseClient) await supabaseClient.from('employees').insert([payload]);
+          }
+        }
+      }
+
+      if (workbook.Sheets["Expenses"]) {
+        const rows = XLSX.utils.sheet_to_json(workbook.Sheets["Expenses"]);
+        for (const r of rows) {
+          if (!r.Name) continue;
+          const name = String(r.Name).trim().toUpperCase();
+          const payload = {
+            name: name,
+            type: String(r.Type || 'regular').toLowerCase(),
+            opening_balance: parseFloat(r.Opening_Balance) || 0
+          };
+          let existing = expensesMasterList.find(ex => ex.name.toUpperCase() === name);
+          if (existing) {
+            Object.assign(existing, payload);
+            if (navigator.onLine && supabaseClient && existing.id) await supabaseClient.from('expenses_master').update(payload).eq('id', existing.id);
+          } else {
+            expensesMasterList.push(payload);
+            if (navigator.onLine && supabaseClient) await supabaseClient.from('expenses_master').insert([payload]);
+          }
+        }
+      }
+
+      localStorage.setItem(`ALNASSR_${currentShopId}_CUSTOMERS`, JSON.stringify(customersList));
+      localStorage.setItem(`ALNASSR_${currentShopId}_VENDORS`, JSON.stringify(vendorsList));
+      localStorage.setItem(`ALNASSR_${currentShopId}_EMPLOYEES`, JSON.stringify(employeesList));
+      localStorage.setItem(`ALNASSR_${currentShopId}_EXPENSES`, JSON.stringify(expensesMasterList));
+
+      populateDropdowns();
+      renderActiveMasterList();
+      alert("എക്സൽ ഫയലിൽ നിന്നുള്ള വിവരങ്ങൾ വിജയകരമായി സിങ്ക് ചെയ്തു!");
+    } catch (err) {
+      alert("എക്സൽ റീഡിങ് പിശക്: " + err.message);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+  event.target.value = "";
+}
+
+// ========================================================
+// 6. 1-CLICK FULL BACKUP & RESTORE (DISASTER RECOVERY JSON)
+// ========================================================
+function downloadFullBackupJSON() {
+  try {
+    const backupObj = {
+      app: "ALNASSR Quick POS",
+      version: "2.0",
+      export_date: new Date().toISOString(),
+      shop_id: currentShopId,
+      shop_name: (currentShop && currentShop.name) ? currentShop.name : "ALNASSR",
+      opening_settings: openingSettings,
+      customers: customersList,
+      vendors: vendorsList,
+      employees: employeesList,
+      expenses_master: expensesMasterList,
+      agents: agentsList,
+      transactions: transactionsList
+    };
+
+    const jsonStr = JSON.stringify(backupObj, null, 2);
+    const blob = new Blob([jsonStr], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `ALNASSR_BACKUP_${currentShopId || 'SHOP'}_${getSaudiBusinessDate()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    alert("ബാക്കപ്പ് എടുക്കാൻ കഴിഞ്ഞില്ല: " + err.message);
+  }
+}
+
+async function requestRestoreBackup(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const enteredPin = prompt("ബാക്കപ്പ് റീസ്റ്റോർ ചെയ്യാൻ സൂപ്പർ അഡ്മിൻ മാസ്റ്റർ പിൻ നൽകുക:");
+  const masterPin = getMasterPin();
+  if (enteredPin !== masterPin) {
+    event.target.value = "";
+    return alert("അഡ്മിൻ മാസ്റ്റർ പിൻ തെറ്റാണ്!");
+  }
+
+  if (!confirm("⚠️ മുന്നറിയിപ്പ്: ഈ ബാക്കപ്പ് റീസ്റ്റോർ ചെയ്താൽ നിലവിലുള്ള എല്ലാ ഡാറ്റയും മാറ്റിയെഴുതപ്പെടും!\n\nതുടരണമെന്ന് ഉറപ്പാണോ?")) {
+    event.target.value = "";
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = async function (e) {
+    try {
+      const backupData = JSON.parse(e.target.result);
+      if (!backupData.customers && !backupData.transactions) {
+        return alert("അസാധുവായ ബാക്കപ്പ് ഫയൽ!");
+      }
+
+      customersList = backupData.customers || [];
+      vendorsList = backupData.vendors || [];
+      employeesList = backupData.employees || [];
+      expensesMasterList = backupData.expenses_master || [];
+      agentsList = backupData.agents || [];
+      transactionsList = backupData.transactions || [];
+      if (backupData.opening_settings) openingSettings = backupData.opening_settings;
+
+      localStorage.setItem(`ALNASSR_${currentShopId}_CUSTOMERS`, JSON.stringify(customersList));
+      localStorage.setItem(`ALNASSR_${currentShopId}_VENDORS`, JSON.stringify(vendorsList));
+      localStorage.setItem(`ALNASSR_${currentShopId}_EMPLOYEES`, JSON.stringify(employeesList));
+      localStorage.setItem(`ALNASSR_${currentShopId}_EXPENSES`, JSON.stringify(expensesMasterList));
+      localStorage.setItem(`ALNASSR_${currentShopId}_AGENTS`, JSON.stringify(agentsList));
+      localStorage.setItem(`ALNASSR_${currentShopId}_TRANSACTIONS`, JSON.stringify(transactionsList));
+
+      if (navigator.onLine && supabaseClient) {
+        alert("ക്ലൗഡിലേക്ക് ഡാറ്റ ബാക്കപ്പ് അപ്‌ലോഡ് ചെയ്യുന്നു. അല്പം കാത്തിരിക്കുക...");
+        if (transactionsList.length > 0) {
+          const chunkSize = 200;
+          for (let i = 0; i < transactionsList.length; i += chunkSize) {
+            const chunk = transactionsList.slice(i, i + chunkSize).map(t => {
+              const { id, ...cleanT } = t;
+              return cleanT;
+            });
+            await supabaseClient.from('transactions').upsert(chunk);
+          }
+        }
+      }
+
+      populateDropdowns();
+      renderActiveMasterList();
+      closeBackupModal();
+      alert("സിസ്റ്റം ബാക്കപ്പ് വിജയകരമായി റീസ്റ്റോർ ചെയ്തു!");
+    } catch (err) {
+      alert("റീസ്റ്റോർ പിശക്: " + err.message);
+    }
+  };
+  reader.readAsText(file);
+  event.target.value = "";
 }
