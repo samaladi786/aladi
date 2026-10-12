@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="ml">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Daily Cash Closing - AlNassr</title>
+  
+  <!-- TAILWIND CSS & ICONS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- MULTI-SHOP CONFIG INTEGRATION -->
+  <script src="config.js"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@500;700;800;900&family=Noto+Sans+Malayalam:wght@500;700;900&display=swap');
+    body { font-family: 'Manrope', 'Noto Sans Malayalam', sans-serif; }
+    input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+    input[type=number] { -moz-appearance: textfield; }
+
+    /* COMPACT A4 PRINT SETUP (SINGLE PAGE) */
+    @media print {
+      @page {
+        size: A4 portrait;
+        margin: 8mm 10mm;
+      }
+      .no-print { display: none !important; }
+      body { background: white !important; padding: 0 !important; color: #000 !important; }
+      .print-border { border: 1.5px solid #000 !important; border-radius: 0 !important; }
+      .print-table th, .print-table td { border: 1px solid #333 !important; font-size: 11px !important; padding: 4px 6px !important; }
+      .print-box { border: 1.5px solid #000 !important; background: transparent !important; }
+    }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-800 min-h-screen p-2 sm:p-5 text-xs">
+
+  <div class="max-w-2xl mx-auto bg-white rounded-2xl shadow-lg border border-slate-200 p-4 sm:p-6 print-border space-y-3.5">
+    
+    <!-- TOP CONTROLS (SHOP SELECTOR & DATE) -->
+    <div class="no-print bg-slate-50 p-2.5 rounded-xl border border-slate-200 flex flex-wrap justify-between items-center gap-2">
+      <div class="flex items-center gap-2">
+        <label class="font-black text-slate-700">ഷോപ്പ്:</label>
+        <select id="shopSelector" onchange="onShopChange()" class="p-1.5 px-3 border border-slate-300 rounded-lg font-black bg-white outline-none cursor-pointer">
+          <!-- Dynamic Shops from config.js -->
+        </select>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <label class="font-black text-slate-700">തീയതി:</label>
+        <input type="date" id="closingDate" onchange="saveData()" class="p-1 px-2 border border-slate-300 rounded-lg font-black bg-white outline-none" />
+      </div>
+    </div>
+
+    <!-- PRINT HEADER -->
+    <div class="border-b-2 border-slate-900 pb-2 flex justify-between items-center">
+      <div class="flex items-center gap-3">
+        <img id="shopLogo" src="" alt="Logo" class="w-10 h-10 object-contain hidden" />
+        <div>
+          <h1 id="shopTitle" class="text-base sm:text-lg font-black text-slate-950 uppercase tracking-wide">SHOP NAME</h1>
+          <p class="text-[11px] font-bold text-slate-600">DAILY CASH CLOSING REPORT</p>
+        </div>
+      </div>
+      <div class="text-right">
+        <p class="text-xs font-black text-slate-900" id="printDateDisplay"></p>
+        <span class="text-[10px] font-bold text-slate-500 uppercase">Cashier Verification</span>
+      </div>
+    </div>
+
+    <!-- 1. COUNTER CASH (COMPACT) -->
+    <div class="bg-emerald-50/70 p-2.5 rounded-xl border border-emerald-300 print-box flex justify-between items-center">
+      <span class="font-black text-emerald-950 text-xs">💵 കൗണ്ടറിലുള്ള ക്യാഷ് (Cash in Drawer):</span>
+      <div class="w-40 sm:w-48">
+        <input 
+          type="number" 
+          step="any" 
+          id="counterCash" 
+          placeholder="0.00" 
+          oninput="calculateTotals(); saveData();" 
+          class="w-full text-right text-sm font-black p-1.5 px-3 rounded-lg border border-emerald-400 bg-white outline-none focus:ring-1 focus:ring-emerald-600 text-emerald-950 font-mono" 
+        />
+      </div>
+    </div>
+
+    <!-- 2. MADA POS MACHINES (COMPACT) -->
+    <div class="bg-blue-50/70 p-2.5 rounded-xl border border-blue-300 print-box space-y-2">
+      <div class="flex justify-between items-center">
+        <span class="font-black text-blue-950 text-xs">💳 മദാ കാർഡ് മെഷീനുകൾ (Mada POS LDR):</span>
+        <button type="button" onclick="addMadaMachine()" class="no-print bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-[11px] px-2.5 py-1 rounded-lg shadow transition flex items-center gap-1 cursor-pointer">
+          <i data-lucide="plus-circle" class="w-3.5 h-3.5"></i> + മെഷീൻ
+        </button>
+      </div>
+
+      <div id="madaMachinesList" class="space-y-1.5">
+        <!-- Dynamic Machines -->
+      </div>
+
+      <div class="flex justify-between items-center pt-1.5 border-t border-blue-200 text-xs font-black text-blue-950">
+        <span>ആകെ മദാ ബാങ്ക് (Total Mada):</span>
+        <span id="displayTotalMada" class="text-xs text-blue-900 font-mono">0.00 SR</span>
+      </div>
+    </div>
+
+    <!-- 3. EXPENSES (COMPACT TABLE & QUICK ADD) -->
+    <div class="bg-amber-50/70 p-2.5 rounded-xl border border-amber-300 print-box space-y-2">
+      <span class="font-black text-amber-950 text-xs block">⚡ പെട്ടിയിൽ നിന്നുള്ള ചിലവുകൾ / പർച്ചേസ് (Expenses):</span>
+
+      <!-- Quick Add Input (No-Print) -->
+      <div class="no-print bg-white p-2 rounded-lg border border-amber-300 flex gap-2 items-center">
+        <input 
+          type="text" 
+          id="expDescInput" 
+          placeholder="ഇനം / വിവരണം..." 
+          class="flex-1 p-1 px-2 text-xs font-bold border rounded outline-none uppercase" 
+          onkeydown="if(event.key === 'Enter') document.getElementById('expAmtInput').focus();"
+        />
+        <input 
+          type="number" 
+          step="any" 
+          id="expAmtInput" 
+          placeholder="തുക" 
+          class="w-28 p-1 px-2 text-xs font-black border rounded outline-none text-right font-mono" 
+          onkeydown="if(event.key === 'Enter') addExpenseRow();"
+        />
+        <button type="button" onclick="addExpenseRow()" class="bg-amber-600 hover:bg-amber-700 text-white font-black text-xs px-3 py-1 rounded shadow cursor-pointer">
+          + ചേർക്കുക
+        </button>
+      </div>
+
+      <!-- Compact Expenses Table -->
+      <table class="w-full text-left border-collapse print-table bg-white rounded-lg overflow-hidden border border-amber-200">
+        <thead>
+          <tr class="bg-amber-100 text-amber-950 font-black text-[11px] border-b">
+            <th class="p-1.5 w-8 text-center">#</th>
+            <th class="p-1.5">ഇനം / വിവരണം</th>
+            <th class="p-1.5 text-right w-28">തുക (SR)</th>
+            <th class="p-1.5 text-center w-8 no-print">✕</th>
+          </tr>
+        </thead>
+        <tbody id="expensesTableBody" class="font-bold text-[11px] divide-y divide-slate-100">
+          <!-- Dynamic Rows -->
+        </tbody>
+        <tfoot>
+          <tr class="font-black text-[11px] bg-amber-100/70 border-t">
+            <td colspan="2" class="p-1.5 uppercase text-amber-950">ആകെ ചിലവുകൾ (Total Outflow):</td>
+            <td id="displayTotalExpenses" class="p-1.5 text-right text-amber-900 font-mono text-xs">0.00</td>
+            <td class="no-print"></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+
+    <!-- 4. FINAL CLOSING SUMMARY (COMPACT & BOLD) -->
+    <div class="bg-slate-900 text-white p-3 sm:p-4 rounded-xl space-y-2 print-box border border-slate-950">
+      <div class="flex justify-between items-center text-emerald-400 border-b border-slate-800 pb-1 text-xs">
+        <span class="font-bold">1. ടോട്ടൽ ക്യാഷ് സെയിൽ (Cash + Expenses):</span>
+        <span id="finalCashSale" class="font-black font-mono text-sm">0.00 SR</span>
+      </div>
+
+      <div class="flex justify-between items-center text-blue-400 border-b border-slate-800 pb-1 text-xs">
+        <span class="font-bold">2. ടോട്ടൽ ബാങ്ക് സെയിൽ (Total Mada POS):</span>
+        <span id="finalBankSale" class="font-black font-mono text-sm">0.00 SR</span>
+      </div>
+
+      <div class="flex justify-between items-center text-amber-400 pt-1 text-sm font-black">
+        <span>⭐ ആകെ കച്ചവടം (GRAND TOTAL SALES):</span>
+        <span id="finalGrandSale" class="font-mono text-base underline decoration-double">0.00 SR</span>
+      </div>
+    </div>
+
+    <!-- SIGNATURES (A4 PRINT FOOTER) -->
+    <div class="pt-6 border-t border-slate-800 justify-between items-end text-[11px] font-black hidden print:flex">
+      <div class="text-center">
+        ...................................................<br>ക്യാഷ്യറുടെ ഒപ്പ്
+      </div>
+      <div class="text-center">
+        ...................................................<br>മാനേജർ / ഇൻ-ചാർജ് ഒപ്പ്
+      </div>
+    </div>
+
+    <!-- BOTTOM ACTION BUTTONS (NO-PRINT) -->
+    <div class="no-print flex flex-wrap gap-2 justify-center pt-2 border-t border-slate-200">
+      <button onclick="window.print()" class="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-xs rounded-xl shadow transition flex items-center gap-1.5 cursor-pointer">
+        <i data-lucide="printer" class="w-3.5 h-3.5"></i> 🖨️ A4 പ്രിന്റ്
+      </button>
+
+      <button onclick="shareWhatsApp()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl shadow transition flex items-center gap-1.5 cursor-pointer">
+        <i data-lucide="share-2" class="w-3.5 h-3.5"></i> 🟢 വാട്‌സ്ആപ്പ്
+      </button>
+
+      <button onclick="resetDayData()" class="px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs rounded-xl shadow transition flex items-center gap-1.5 cursor-pointer">
+        <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i> 🔄 ക്ലിയർ (New Day)
+      </button>
+    </div>
+
+  </div>
+
+  <script>
+    var currentShop = null;
+    var closingState = {
+      date: new Date().toISOString().split('T')[0],
+      counterCash: 0,
+      madaMachines: [{ label: "മെഷീൻ 1 (Mada 1)", amount: 0 }],
+      expenses: []
+    };
+
+    function initShops() {
+      const shops = (window.SHOPS_CONFIG || window.SHOPS || []);
+      const sel = document.getElementById("shopSelector");
+      sel.innerHTML = "";
+
+      if (shops.length === 0) {
+        sel.innerHTML = `<option value="default">Default Shop</option>`;
+        currentShop = { id: 'default', name: 'ALNASSR' };
+      } else {
+        shops.forEach(s => {
+          const opt = document.createElement("option");
+          opt.value = s.id;
+          opt.textContent = s.name;
+          sel.appendChild(opt);
+        });
+        const savedShopId = localStorage.getItem("ALNASSR_SELECTED_SHOP_ID") || shops[0].id;
+        sel.value = savedShopId;
+        currentShop = shops.find(s => s.id === sel.value) || shops[0];
+      }
+      applyShopDetails();
+      loadData();
+    }
+
+    function onShopChange() {
+      const shops = (window.SHOPS_CONFIG || window.SHOPS || []);
+      const sel = document.getElementById("shopSelector");
+      currentShop = shops.find(s => s.id === sel.value) || { id: sel.value, name: sel.value };
+      localStorage.setItem("ALNASSR_SELECTED_SHOP_ID", currentShop.id);
+      applyShopDetails();
+      loadData();
+    }
+
+    function applyShopDetails() {
+      document.getElementById("shopTitle").innerText = (currentShop.name || 'ALNASSR').toUpperCase();
+      const logoEl = document.getElementById("shopLogo");
+      if (currentShop.logo) {
+        logoEl.src = currentShop.logo;
+        logoEl.classList.remove("hidden");
+      } else {
+        logoEl.classList.add("hidden");
+      }
+    }
+
+    function loadData() {
+      const shopId = currentShop ? currentShop.id : 'default';
+      const saved = localStorage.getItem(`ALNASSR_${shopId}_CLOSING`);
+      if (saved) {
+        try { closingState = JSON.parse(saved); } catch(e) {}
+      } else {
+        closingState = {
+          date: new Date().toISOString().split('T')[0],
+          counterCash: 0,
+          madaMachines: [{ label: "മെഷീൻ 1 (Mada 1)", amount: 0 }],
+          expenses: []
+        };
+      }
+
+      document.getElementById("closingDate").value = closingState.date || new Date().toISOString().split('T')[0];
+      document.getElementById("printDateDisplay").innerText = `തീയതി: ${document.getElementById("closingDate").value}`;
+      document.getElementById("counterCash").value = closingState.counterCash || "";
+
+      renderMadaMachines();
+      renderExpensesTable();
+      calculateTotals();
+    }
+
+    function saveData() {
+      const shopId = currentShop ? currentShop.id : 'default';
+      closingState.date = document.getElementById("closingDate").value;
+      document.getElementById("printDateDisplay").innerText = `തീയതി: ${closingState.date}`;
+      closingState.counterCash = parseFloat(document.getElementById("counterCash").value) || 0;
+      localStorage.setItem(`ALNASSR_${shopId}_CLOSING`, JSON.stringify(closingState));
+    }
+
+    // MADA POS
+    function renderMadaMachines() {
+      const container = document.getElementById("madaMachinesList");
+      container.innerHTML = "";
+      closingState.madaMachines.forEach((m, idx) => {
+        const row = document.createElement("div");
+        row.className = "flex items-center gap-1.5";
+        row.innerHTML = `
+          <input type="text" value="${m.label}" onchange="closingState.madaMachines[${idx}].label = this.value; saveData();" class="flex-1 p-1 px-2 text-xs font-bold border rounded bg-white outline-none" />
+          <input type="number" step="any" value="${m.amount || ''}" placeholder="0.00" oninput="closingState.madaMachines[${idx}].amount = parseFloat(this.value) || 0; calculateTotals(); saveData();" class="w-32 p-1 px-2 text-xs font-black border rounded bg-white outline-none text-right font-mono" />
+          ${closingState.madaMachines.length > 1 ? `<button type="button" onclick="removeMadaMachine(${idx})" class="no-print text-rose-500 hover:text-rose-700 p-1 font-black cursor-pointer">✕</button>` : `<div class="w-4 no-print"></div>`}
+        `;
+        container.appendChild(row);
+      });
+    }
+
+    function addMadaMachine() {
+      const num = closingState.madaMachines.length + 1;
+      closingState.madaMachines.push({ label: `മെഷീൻ ${num} (Mada ${num})`, amount: 0 });
+      renderMadaMachines();
+      calculateTotals();
+      saveData();
+    }
+
+    function removeMadaMachine(idx) {
+      closingState.madaMachines.splice(idx, 1);
+      renderMadaMachines();
+      calculateTotals();
+      saveData();
+    }
+
+    // EXPENSES
+    function renderExpensesTable() {
+      const tbody = document.getElementById("expensesTableBody");
+      tbody.innerHTML = "";
+      if (closingState.expenses.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="4" class="p-2 text-center text-slate-400 font-bold">ചിലവുകൾ ഇല്ല</td></tr>`;
+        return;
+      }
+      closingState.expenses.forEach((item, idx) => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td class="p-1.5 text-center text-slate-500">${idx + 1}</td>
+          <td class="p-1.5 font-black text-slate-900">${item.desc}</td>
+          <td class="p-1.5 text-right font-black text-amber-950 font-mono">${item.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+          <td class="p-1.5 text-center no-print"><button onclick="removeExpenseRow(${idx})" class="text-rose-500 hover:text-rose-700 font-black cursor-pointer">✕</button></td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function addExpenseRow() {
+      const descInput = document.getElementById("expDescInput");
+      const amtInput = document.getElementById("expAmtInput");
+      const desc = descInput.value.trim().toUpperCase();
+      const amt = parseFloat(amtInput.value) || 0;
+
+      if (!desc || amt <= 0) return alert("വിവരണം തുകയും നൽകുക!");
+      closingState.expenses.push({ desc: desc, amount: amt });
+      descInput.value = "";
+      amtInput.value = "";
+      descInput.focus();
+
+      renderExpensesTable();
+      calculateTotals();
+      saveData();
+    }
+
+    function removeExpenseRow(idx) {
+      closingState.expenses.splice(idx, 1);
+      renderExpensesTable();
+      calculateTotals();
+      saveData();
+    }
+
+    // TOTALS
+    function calculateTotals() {
+      const counterCash = parseFloat(document.getElementById("counterCash").value) || 0;
+      let totalMada = 0;
+      closingState.madaMachines.forEach(m => totalMada += (m.amount || 0));
+
+      let totalExpenses = 0;
+      closingState.expenses.forEach(e => totalExpenses += (e.amount || 0));
+
+      const totalCashSale = counterCash + totalExpenses;
+      const grandTotal = totalCashSale + totalMada;
+
+      document.getElementById("displayTotalMada").innerText = `${totalMada.toLocaleString('en-IN', { minimumFractionDigits: 2 })} SR`;
+      document.getElementById("displayTotalExpenses").innerText = totalExpenses.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+
+      document.getElementById("finalCashSale").innerText = `${totalCashSale.toLocaleString('en-IN', { minimumFractionDigits: 2 })} SR`;
+      document.getElementById("finalBankSale").innerText = `${totalMada.toLocaleString('en-IN', { minimumFractionDigits: 2 })} SR`;
+      document.getElementById("finalGrandSale").innerText = `${grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })} SR`;
+    }
+
+    // WHATSAPP
+    function shareWhatsApp() {
+      const dt = document.getElementById("closingDate").value;
+      const shopName = currentShop ? currentShop.name.toUpperCase() : "ALNASSR";
+      const counterCash = parseFloat(document.getElementById("counterCash").value) || 0;
+
+      let totalMada = 0;
+      let madaText = "";
+      closingState.madaMachines.forEach(m => {
+        totalMada += (m.amount || 0);
+        if (m.amount > 0) madaText += `  ▫️ ${m.label}: ${m.amount} SR\n`;
+      });
+
+      let totalExpenses = 0;
+      let expText = "";
+      closingState.expenses.forEach(e => {
+        totalExpenses += e.amount;
+        expText += `  ▫️ ${e.desc}: ${e.amount} SR\n`;
+      });
+
+      const totalCashSale = counterCash + totalExpenses;
+      const grandTotal = totalCashSale + totalMada;
+
+      let text = `📊 *${shopName} - DAILY CASH CLOSING*\n` +
+                 `📅 *Date:* ${dt}\n` +
+                 `--------------------------------\n` +
+                 `💵 *Counter Cash:* ${counterCash.toLocaleString('en-IN')} SR\n` +
+                 `⚡ *Expenses Outflow:* ${totalExpenses.toLocaleString('en-IN')} SR\n` +
+                 (expText ? `${expText}` : '') +
+                 `💰 *Total Cash Sale:* ${totalCashSale.toLocaleString('en-IN')} SR\n` +
+                 `--------------------------------\n` +
+                 `💳 *Total Mada Bank:* ${totalMada.toLocaleString('en-IN')} SR\n` +
+                 (madaText ? `${madaText}` : '') +
+                 `--------------------------------\n` +
+                 `⭐ *GRAND TOTAL SALES:* ${grandTotal.toLocaleString('en-IN')} SR\n` +
+                 `--------------------------------`;
+
+      window.open('https://api.whatsapp.com/send?text=' + encodeURIComponent(text), '_blank');
+    }
+
+    // RESET
+    function resetDayData() {
+      if (!confirm("പുതിയ ദിവസത്തെ കണക്കുകൾ തുടങ്ങാൻ ഈ ഷോപ്പിലെ വിവരങ്ങൾ ക്ലിയർ ചെയ്യണമോ?")) return;
+      const shopId = currentShop ? currentShop.id : 'default';
+      closingState = {
+        date: new Date().toISOString().split('T')[0],
+        counterCash: 0,
+        madaMachines: [{ label: "മെഷീൻ 1 (Mada 1)", amount: 0 }],
+        expenses: []
+      };
+      localStorage.removeItem(`ALNASSR_${shopId}_CLOSING`);
+      loadData();
+    }
+
+    window.onload = function() {
+      initShops();
+      if (window.lucide) lucide.createIcons();
+    };
+  </script>
+</body>
+</html>
