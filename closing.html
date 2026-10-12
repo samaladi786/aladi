@@ -17,6 +17,9 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
 
+  <!-- SUPABASE JS CLIENT -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
   <!-- MULTI-SHOP CONFIG INTEGRATION -->
   <script src="config.js"></script>
 
@@ -80,7 +83,7 @@
   <!-- ========================================== -->
   <!-- 2. MAIN APP CONTAINER                      -->
   <!-- ========================================== -->
-  <div id="appContainer" class="w-full max-w-2xl bg-white rounded-3xl shadow-lg border border-slate-200 p-4 sm:p-6 print-border space-y-4 hidden my-auto">
+  <div id="appContainer" class="w-full max-w-2xl bg-white rounded-3xl shadow-lg border border-slate-200 p-4 sm:p-6 print-border space-y-4 hidden my-auto relative">
     
     <!-- TOP CONTROLS (SHOP SELECTOR, DATE & LOGOUT) -->
     <div class="no-print bg-slate-50 p-3 rounded-2xl border border-slate-200 flex flex-wrap justify-between items-center gap-2">
@@ -97,7 +100,7 @@
         </button>
 
         <label class="font-black text-slate-700">തീയതി:</label>
-        <input type="date" id="closingDate" onchange="saveData()" class="p-1.5 px-2.5 border border-slate-300 rounded-xl font-black bg-white outline-none cursor-pointer text-xs" />
+        <input type="date" id="closingDate" onchange="onDateChanged()" class="p-1.5 px-2.5 border border-slate-300 rounded-xl font-black bg-white outline-none cursor-pointer text-xs" />
         
         <button onclick="logoutApp()" title="ലോഗൗട്ട്" class="p-2 text-rose-600 hover:bg-rose-50 rounded-xl border border-rose-200 font-bold transition flex items-center gap-1 cursor-pointer">
           <i data-lucide="log-out" class="w-4 h-4"></i>
@@ -120,7 +123,7 @@
       </div>
     </div>
 
-    <!-- 1. COUNTER CASH (BIGGER INPUT) -->
+    <!-- 1. COUNTER CASH -->
     <div class="bg-emerald-50/70 p-3 sm:p-3.5 rounded-2xl border-2 border-emerald-300 print-box flex flex-wrap justify-between items-center gap-2">
       <span class="font-black text-emerald-950 text-xs sm:text-sm">💵 കൗണ്ടറിലുള്ള ക്യാഷ് (Cash in Drawer):</span>
       <div class="w-full sm:w-52">
@@ -131,13 +134,13 @@
           placeholder="0.00" 
           onclick="this.select()"
           onfocus="this.select()"
-          oninput="calculateTotals(); saveData();" 
+          oninput="calculateTotals(); saveLocalState();" 
           class="w-full text-right text-base sm:text-lg font-black p-2.5 px-3.5 rounded-xl border-2 border-emerald-400 bg-white outline-none focus:ring-2 focus:ring-emerald-600 text-emerald-950 font-mono shadow-sm cursor-pointer" 
         />
       </div>
     </div>
 
-    <!-- 2. MADA POS MACHINES (BIGGER INPUTS & AUTO UPPERCASE) -->
+    <!-- 2. MADA POS MACHINES -->
     <div class="bg-blue-50/70 p-3 sm:p-3.5 rounded-2xl border-2 border-blue-300 print-box space-y-2.5">
       <div class="flex justify-between items-center">
         <span class="font-black text-blue-950 text-xs sm:text-sm">💳 മദാ കാർഡ് മെഷീനുകൾ (Mada POS LDR):</span>
@@ -154,36 +157,53 @@
       </div>
     </div>
 
-    <!-- 3. EXPENSES (MOBILE-FRIENDLY QUICK ENTRY & AUTO UPPERCASE) -->
+    <!-- 3. EXPENSES WITH LIVE DUE SEARCH & AUTO-CAPITAL -->
     <div class="bg-amber-50/70 p-3 sm:p-3.5 rounded-2xl border-2 border-amber-300 print-box space-y-2.5">
       <span class="font-black text-amber-950 text-xs sm:text-sm block">⚡ പെട്ടിയിൽ നിന്നുള്ള ചിലവുകൾ / പർച്ചേസ് (Expenses):</span>
 
-      <!-- Mobile-Friendly Touch-Optimized Entry Box -->
-      <div class="no-print bg-white p-2.5 rounded-2xl border-2 border-amber-300 shadow-sm flex flex-col sm:flex-row gap-2 items-stretch sm:items-center">
-        <input 
-          type="text" 
-          id="expDescInput" 
-          placeholder="ഇനം / വിവരണം..." 
-          onclick="this.select()"
-          onfocus="this.select()"
-          oninput="this.value = this.value.toUpperCase();"
-          class="flex-1 p-2.5 px-3 text-xs sm:text-sm font-black border-2 border-slate-200 rounded-xl outline-none focus:border-amber-500 uppercase uppercase-input" 
-          onkeydown="if(event.key === 'Enter') document.getElementById('expAmtInput').focus();"
-        />
-        <div class="flex gap-2">
-          <input 
-            type="number" 
-            step="any" 
-            id="expAmtInput" 
-            placeholder="തുക" 
-            onclick="this.select()"
-            onfocus="this.select()"
-            class="flex-1 sm:w-32 p-2.5 px-3 text-xs sm:text-sm font-black border-2 border-slate-200 rounded-xl outline-none focus:border-amber-500 text-right font-mono" 
-            onkeydown="if(event.key === 'Enter') addExpenseRow();"
-          />
-          <button type="button" onclick="addExpenseRow()" class="bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white font-black text-xs sm:text-sm px-4 py-2.5 rounded-xl shadow cursor-pointer whitespace-nowrap">
-            + ചേർക്കുക
-          </button>
+      <!-- Touch-Friendly Single Search Entry Box -->
+      <div class="no-print bg-white p-3 rounded-2xl border-2 border-amber-300 shadow-sm space-y-2">
+        <div class="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center relative">
+          
+          <!-- Unified Party Search -->
+          <div class="flex-1 relative">
+            <input 
+              type="text" 
+              id="expPartyInput" 
+              placeholder="വെണ്ടർ / സ്റ്റാഫ് / ചിലവ് തിരയുക..." 
+              onclick="this.select()"
+              onfocus="showPartyDropdown()"
+              oninput="filterPartyDropdown(this.value)"
+              class="w-full p-2.5 px-3 text-xs sm:text-sm font-black border-2 border-slate-200 rounded-xl outline-none focus:border-amber-500 uppercase uppercase-input" 
+              autocomplete="off"
+            />
+            <!-- Dropdown Options Popup -->
+            <div id="partySuggestions" class="absolute left-0 right-0 top-full mt-1 bg-white border-2 border-slate-300 rounded-xl shadow-xl max-h-56 overflow-y-auto z-50 hidden divide-y divide-slate-100"></div>
+          </div>
+
+          <!-- Amount Input -->
+          <div class="flex gap-2">
+            <input 
+              type="number" 
+              step="any" 
+              id="expAmtInput" 
+              placeholder="തുക" 
+              onclick="this.select()"
+              onfocus="this.select()"
+              oninput="updateLiveRemainingPreview()"
+              class="flex-1 sm:w-32 p-2.5 px-3 text-xs sm:text-sm font-black border-2 border-slate-200 rounded-xl outline-none focus:border-amber-500 text-right font-mono" 
+              onkeydown="if(event.key === 'Enter') addExpenseRow();"
+            />
+            <button type="button" onclick="addExpenseRow()" class="bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white font-black text-xs sm:text-sm px-4 py-2.5 rounded-xl shadow cursor-pointer whitespace-nowrap">
+              + ചേർക്കുക
+            </button>
+          </div>
+        </div>
+
+        <!-- Live Balance Feedback Badge -->
+        <div id="liveBalanceBadge" class="hidden text-[11px] font-bold bg-amber-50 p-2 rounded-xl border border-amber-200 flex flex-wrap justify-between items-center text-amber-950">
+          <span>നിലവിലെ ബാക്കി: <b id="lblCurrentDue" class="font-mono text-rose-700">0.00</b></span>
+          <span>ഇനി ബാക്കി വരുന്നത്: <b id="lblRemainingDue" class="font-mono text-emerald-700">0.00</b></span>
         </div>
       </div>
 
@@ -193,7 +213,8 @@
           <tr class="bg-amber-100 text-amber-950 font-black text-[11px] border-b">
             <th class="p-2 w-8 text-center">#</th>
             <th class="p-2">ഇനം / വിവരണം</th>
-            <th class="p-2 text-right w-32">തുക</th>
+            <th class="p-2 text-right w-28">തുക</th>
+            <th class="p-2 text-right w-28">ബാക്കി കുടിശ്ശിക</th>
             <th class="p-2 text-center w-10 no-print">✕</th>
           </tr>
         </thead>
@@ -202,13 +223,13 @@
           <tr class="font-black text-[11px] bg-amber-100/70 border-t">
             <td colspan="2" class="p-2 uppercase text-amber-950">ആകെ ചിലവുകൾ (Total Outflow):</td>
             <td id="displayTotalExpenses" class="p-2 text-right text-amber-900 font-mono text-xs font-black">0.00</td>
-            <td class="no-print"></td>
+            <td colspan="2" class="no-print"></td>
           </tr>
         </tfoot>
       </table>
     </div>
 
-    <!-- 4. FINAL SUMMARY (NO CURRENCY SYMBOLS) -->
+    <!-- 4. FINAL SUMMARY -->
     <div class="bg-slate-900 text-white p-3.5 sm:p-4 rounded-2xl space-y-2 print-box border border-slate-950 shadow-md">
       <div class="flex justify-between items-center text-emerald-400 border-b border-slate-800 pb-1.5 text-xs sm:text-sm">
         <span class="font-bold">1. ടോട്ടൽ ക്യാഷ് സെയിൽ (Cash + Expenses):</span>
@@ -236,18 +257,19 @@
       </div>
     </div>
 
-    <!-- ACTION BUTTONS -->
+    <!-- BOTTOM ACTION BUTTONS -->
     <div class="no-print flex flex-wrap gap-2 justify-center pt-2 border-t border-slate-200">
       <button onclick="window.print()" class="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-xs rounded-xl shadow transition flex items-center gap-1.5 cursor-pointer">
-        <i data-lucide="printer" class="w-4 h-4"></i> 🖨️ A4 പ്രിന്റ്
+        <i data-lucide="printer" class="w-3.5 h-3.5"></i> 🖨️ A4 പ്രിന്റ്
       </button>
 
       <button onclick="shareWhatsApp()" class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl shadow transition flex items-center gap-1.5 cursor-pointer">
-        <i data-lucide="share-2" class="w-4 h-4"></i> 🟢 വാട്‌സ്ആപ്പ്
+        <i data-lucide="share-2" class="w-3.5 h-3.5"></i> 🟢 വാട്‌സ്ആപ്പ്
       </button>
 
-      <button onclick="resetDayData()" class="px-3.5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs rounded-xl shadow transition flex items-center gap-1.5 cursor-pointer">
-        <i data-lucide="rotate-ccw" class="w-4 h-4"></i> 🔄 ക്ലിയർ (New Day)
+      <!-- SUBMIT TO CLOUD & MAIN LEDGER BUTTON -->
+      <button onclick="submitClosingToCloud()" class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-black text-xs rounded-xl shadow-lg shadow-indigo-600/30 transition flex items-center gap-1.5 cursor-pointer">
+        <i data-lucide="check-circle-2" class="w-4 h-4"></i> 💾 സബ്മിറ്റ് ക്ലോസിംഗ്
       </button>
     </div>
 
@@ -273,9 +295,7 @@
       }
     }
 
-    // ==========================================
-    // PWA REGISTRATION & INSTALL LOGIC
-    // ==========================================
+    // PWA REGISTRATION
     var deferredPrompt = null;
     window.addEventListener('beforeinstallprompt', (e) => {
       e.preventDefault();
@@ -283,48 +303,22 @@
       const btn = document.getElementById("pwaInstallBtn");
       if (btn) btn.classList.remove("hidden");
     });
-
     function triggerPwaInstall() {
-      if (!deferredPrompt) return alert("ആപ്പ് ഇതിനകം ഇൻസ്റ്റാൾ ചെയ്തിട്ടുണ്ട് അല്ലെങ്കിൽ ബ്രൗസർ സപ്പോർട്ട് ചെയ്യുന്നില്ല.");
+      if (!deferredPrompt) return;
       deferredPrompt.prompt();
-      deferredPrompt.userChoice.then((choiceResult) => {
-        if (choiceResult.outcome === 'accepted') {
-          const btn = document.getElementById("pwaInstallBtn");
-          if (btn) btn.classList.add("hidden");
-        }
-        deferredPrompt = null;
-      });
+      deferredPrompt.userChoice.then(() => { deferredPrompt = null; });
     }
-
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('closing-sw.js').catch(err => {
-        console.warn('SW registration failed:', err);
-      });
+      navigator.serviceWorker.register('closing-sw.js').catch(() => {});
     }
 
-    // ==========================================
-    // CONFIG & PIN LOGIC
-    // ==========================================
-    function getShopsList() {
-      if (window.SHOPS_CONFIG && Array.isArray(window.SHOPS_CONFIG) && window.SHOPS_CONFIG.length > 0) return window.SHOPS_CONFIG;
-      if (window.SHOPS && Array.isArray(window.SHOPS) && window.SHOPS.length > 0) return window.SHOPS;
-      try {
-        if (typeof SHOPS_CONFIG !== 'undefined' && Array.isArray(SHOPS_CONFIG) && SHOPS_CONFIG.length > 0) return SHOPS_CONFIG;
-        if (typeof SHOPS !== 'undefined' && Array.isArray(SHOPS) && SHOPS.length > 0) return SHOPS;
-      } catch(e) {}
-      return [];
-    }
-
-    function getMasterPin() {
-      if (window.MASTER_PIN !== undefined && window.MASTER_PIN !== null) return String(window.MASTER_PIN).trim();
-      try {
-        if (typeof MASTER_PIN !== 'undefined' && MASTER_PIN !== null) return String(MASTER_PIN).trim();
-      } catch(e) {}
-      return null;
-    }
-
+    // STATE VARIABLES
     var currentShop = null;
+    var supabaseClient = null;
     var userRole = 'shop';
+    var masterPartyCache = [];
+    var selectedPartyObject = null;
+
     var closingState = {
       date: getSaudiBusinessDate(),
       counterCash: 0,
@@ -332,6 +326,18 @@
       expenses: []
     };
 
+    function getShopsList() {
+      if (window.SHOPS_CONFIG && Array.isArray(window.SHOPS_CONFIG) && window.SHOPS_CONFIG.length > 0) return window.SHOPS_CONFIG;
+      if (window.SHOPS && Array.isArray(window.SHOPS) && window.SHOPS.length > 0) return window.SHOPS;
+      return [];
+    }
+
+    function getMasterPin() {
+      if (window.MASTER_PIN !== undefined && window.MASTER_PIN !== null) return String(window.MASTER_PIN).trim();
+      return null;
+    }
+
+    // LOGIN
     function verifyLogin() {
       const pinInput = document.getElementById("loginPinInput");
       const enteredPin = String(pinInput.value || '').trim();
@@ -339,7 +345,6 @@
 
       const masterPin = getMasterPin();
       const shops = getShopsList();
-
       const isMaster = (masterPin && enteredPin === masterPin);
       const matchedShop = (shops || []).find(s => String(s.pin).trim() === enteredPin);
 
@@ -351,7 +356,6 @@
       }
 
       sessionStorage.setItem("ALNASSR_CLOSING_LOGGED_IN", "true");
-
       if (isMaster) {
         sessionStorage.setItem("ALNASSR_CLOSING_ROLE", "admin");
         userRole = 'admin';
@@ -380,10 +384,7 @@
         appEl.classList.add("hidden");
         setTimeout(() => {
           const inp = document.getElementById("loginPinInput");
-          if (inp) {
-            inp.focus();
-            inp.select();
-          }
+          if (inp) inp.focus();
         }, 150);
       }
     }
@@ -395,6 +396,7 @@
       checkLoginState();
     }
 
+    // INIT SHOP & SUPABASE
     function initShops() {
       const shops = getShopsList();
       const sel = document.getElementById("shopSelector");
@@ -404,8 +406,6 @@
       if (shops.length === 0) {
         sel.innerHTML = `<option value="default">Default Shop</option>`;
         currentShop = { id: 'default', name: 'ALNASSR' };
-        sel.classList.remove("hidden");
-        badge.classList.add("hidden");
       } else if (userRole === 'admin') {
         sel.classList.remove("hidden");
         badge.classList.add("hidden");
@@ -427,7 +427,7 @@
       }
 
       applyShopDetails();
-      loadData();
+      initSupabaseClient();
     }
 
     function onShopChange() {
@@ -436,7 +436,7 @@
       currentShop = shops.find(s => s.id === sel.value) || { id: sel.value, name: sel.value };
       localStorage.setItem("ALNASSR_SELECTED_SHOP_ID", currentShop.id);
       applyShopDetails();
-      loadData();
+      initSupabaseClient();
     }
 
     function applyShopDetails() {
@@ -450,39 +450,232 @@
       }
     }
 
-    function loadData() {
-      const shopId = currentShop ? currentShop.id : 'default';
-      const saved = localStorage.getItem(`ALNASSR_${shopId}_CLOSING`);
-      const defaultDate = getSaudiBusinessDate();
+    function initSupabaseClient() {
+      if (currentShop && currentShop.url && currentShop.key && window.supabase) {
+        supabaseClient = window.supabase.createClient(currentShop.url, currentShop.key);
+      } else {
+        supabaseClient = null;
+      }
+      fetchMasterPartiesWithBalances();
+      loadDateData();
+    }
 
+    // FETCH VENDORS, EMPLOYEES & EXPENSES WITH BALANCES
+    async function fetchMasterPartiesWithBalances() {
+      masterPartyCache = [];
+      if (!supabaseClient) return;
+
+      try {
+        const [vendRes, empRes, expRes, txRes] = await Promise.all([
+          supabaseClient.from('vendors').select('*'),
+          supabaseClient.from('employees').select('*'),
+          supabaseClient.from('expenses_master').select('*'),
+          supabaseClient.from('transactions').select('*')
+        ]);
+
+        const vendors = vendRes.data || [];
+        const employees = empRes.data || [];
+        const expenses = expRes.data || [];
+        const transactions = txRes.data || [];
+
+        // 1. Vendors Due Calculation
+        vendors.forEach(v => {
+          let due = parseFloat(v.opening_balance) || 0;
+          const vName = (v.name || '').trim().toUpperCase();
+          transactions.forEach(t => {
+            if (t && t.type === 'purchase' && (t.party_name || '').trim().toUpperCase() === vName) {
+              const cr = parseFloat(t.credit_amount) || 0;
+              const ca = Math.abs(parseFloat(t.cash_amount) || 0);
+              const ba = Math.abs(parseFloat(t.bank_amount) || 0);
+              due += (cr - ca - ba);
+            }
+          });
+          masterPartyCache.push({
+            name: vName,
+            type: 'vendor',
+            label: `[VENDOR] ${vName}`,
+            due: Math.max(0, due)
+          });
+        });
+
+        // 2. Employees Pending Salary Calculation
+        employees.forEach(em => {
+          if (em.status === 'stopped') return;
+          const emName = (em.name || '').trim().toUpperCase();
+          let due = parseFloat(em.monthly_salary) || 0;
+          let paid = 0;
+          transactions.forEach(t => {
+            if (t && t.type === 'salary' && (t.party_name || '').toUpperCase().includes(emName)) {
+              paid += (Math.abs(parseFloat(t.cash_amount) || 0) + Math.abs(parseFloat(t.bank_amount) || 0));
+            }
+          });
+          due = Math.max(0, due - paid);
+          masterPartyCache.push({
+            name: emName,
+            type: 'employee',
+            label: `[STAFF] ${emName}`,
+            due: due
+          });
+        });
+
+        // 3. Fixed / Utility Expenses Master
+        expenses.forEach(ex => {
+          const exName = (ex.name || '').trim().toUpperCase();
+          let due = parseFloat(ex.opening_balance) || 0;
+          transactions.forEach(t => {
+            if (t && (t.party_name || '').toUpperCase().startsWith(exName)) {
+              const bill = (t.type === 'expense_bill') ? (parseFloat(t.credit_amount) || 0) : 0;
+              const paid = (t.type === 'expense') ? (Math.abs(parseFloat(t.cash_amount) || 0) + Math.abs(parseFloat(t.bank_amount) || 0)) : 0;
+              due += (bill - paid);
+            }
+          });
+          masterPartyCache.push({
+            name: exName,
+            type: 'expense',
+            label: `[EXPENSE] ${exName}`,
+            due: Math.max(0, due)
+          });
+        });
+
+      } catch (err) {
+        console.warn("Could not fetch master parties with balances:", err);
+      }
+    }
+
+    // SINGLE SEARCHABLE DROPDOWN LOGIC
+    function showPartyDropdown() {
+      filterPartyDropdown(document.getElementById("expPartyInput").value);
+    }
+
+    function filterPartyDropdown(query) {
+      const q = (query || '').trim().toUpperCase();
+      const popup = document.getElementById("partySuggestions");
+      popup.innerHTML = "";
+
+      const filtered = masterPartyCache.filter(p => p.name.includes(q) || p.label.includes(q));
+
+      if (filtered.length === 0) {
+        popup.classList.add("hidden");
+        selectedPartyObject = { name: q, type: 'regular_expense', due: 0 };
+        updateLiveRemainingPreview();
+        return;
+      }
+
+      filtered.slice(0, 15).forEach(p => {
+        const item = document.createElement("div");
+        item.className = "p-2.5 px-3 hover:bg-slate-100 cursor-pointer flex justify-between items-center text-xs font-bold";
+        item.innerHTML = `
+          <span class="text-slate-900">${p.label}</span>
+          <span class="text-[11px] font-mono text-rose-700 font-black">ബാക്കി: ${p.due.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+        `;
+        item.onmousedown = () => selectParty(p);
+        popup.appendChild(item);
+      });
+
+      popup.classList.remove("hidden");
+    }
+
+    function selectParty(party) {
+      selectedPartyObject = party;
+      const inp = document.getElementById("expPartyInput");
+      inp.value = party.name;
+      document.getElementById("partySuggestions").classList.add("hidden");
+
+      const badge = document.getElementById("liveBalanceBadge");
+      badge.classList.remove("hidden");
+      document.getElementById("lblCurrentDue").innerText = party.due.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+      updateLiveRemainingPreview();
+
+      document.getElementById("expAmtInput").focus();
+    }
+
+    function updateLiveRemainingPreview() {
+      if (!selectedPartyObject) {
+        document.getElementById("liveBalanceBadge").classList.add("hidden");
+        return;
+      }
+      const badge = document.getElementById("liveBalanceBadge");
+      badge.classList.remove("hidden");
+      document.getElementById("lblCurrentDue").innerText = selectedPartyObject.due.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+
+      const amt = parseFloat(document.getElementById("expAmtInput").value) || 0;
+      const rem = Math.max(0, selectedPartyObject.due - amt);
+      document.getElementById("lblRemainingDue").innerText = rem.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+    }
+
+    document.addEventListener("click", (e) => {
+      const popup = document.getElementById("partySuggestions");
+      const inp = document.getElementById("expPartyInput");
+      if (e.target !== inp && !popup.contains(e.target)) {
+        popup.classList.add("hidden");
+      }
+    });
+
+    // DATE CHANGED -> LOAD FROM SUPABASE OR LOCAL
+    async function onDateChanged() {
+      await loadDateData();
+    }
+
+    async function loadDateData() {
+      const selectedDate = document.getElementById("closingDate").value || getSaudiBusinessDate();
+      document.getElementById("closingDate").value = selectedDate;
+      document.getElementById("printDateDisplay").innerText = `തീയതി: ${selectedDate}`;
+
+      // 1. Try fetching existing closing from Supabase
+      if (supabaseClient) {
+        try {
+          const { data, error } = await supabaseClient
+            .from('daily_closings')
+            .select('*')
+            .eq('date', selectedDate)
+            .maybeSingle();
+
+          if (data && !error) {
+            closingState = {
+              date: data.date,
+              counterCash: parseFloat(data.counter_cash) || 0,
+              madaMachines: Array.isArray(data.mada_machines) ? data.mada_machines : [{ label: "മെഷീൻ 1 (MADA 1)", amount: 0 }],
+              expenses: Array.isArray(data.expenses_list) ? data.expenses_list : []
+            };
+            populateUIFromState();
+            return;
+          }
+        } catch (e) {
+          console.warn("Could not check cloud closing for date:", e);
+        }
+      }
+
+      // 2. Fallback to LocalStorage
+      const shopId = currentShop ? currentShop.id : 'default';
+      const saved = localStorage.getItem(`ALNASSR_${shopId}_CLOSING_${selectedDate}`);
       if (saved) {
         try { closingState = JSON.parse(saved); } catch(e) {}
       } else {
         closingState = {
-          date: defaultDate,
+          date: selectedDate,
           counterCash: 0,
           madaMachines: [{ label: "മെഷീൻ 1 (MADA 1)", amount: 0 }],
           expenses: []
         };
       }
+      populateUIFromState();
+    }
 
-      document.getElementById("closingDate").value = closingState.date || defaultDate;
-      document.getElementById("printDateDisplay").innerText = `തീയതി: ${document.getElementById("closingDate").value}`;
+    function populateUIFromState() {
       document.getElementById("counterCash").value = closingState.counterCash || "";
-
       renderMadaMachines();
       renderExpensesTable();
       calculateTotals();
     }
 
-    function saveData() {
+    function saveLocalState() {
       const shopId = currentShop ? currentShop.id : 'default';
       closingState.date = document.getElementById("closingDate").value || getSaudiBusinessDate();
-      document.getElementById("printDateDisplay").innerText = `തീയതി: ${closingState.date}`;
       closingState.counterCash = parseFloat(document.getElementById("counterCash").value) || 0;
-      localStorage.setItem(`ALNASSR_${shopId}_CLOSING`, JSON.stringify(closingState));
+      localStorage.setItem(`ALNASSR_${shopId}_CLOSING_${closingState.date}`, JSON.stringify(closingState));
     }
 
+    // MADA POS
     function renderMadaMachines() {
       const container = document.getElementById("madaMachinesList");
       container.innerHTML = "";
@@ -495,7 +688,7 @@
             value="${m.label}" 
             onclick="this.select()"
             onfocus="this.select()"
-            oninput="this.value = this.value.toUpperCase(); closingState.madaMachines[${idx}].label = this.value; saveData();" 
+            oninput="this.value = this.value.toUpperCase(); closingState.madaMachines[${idx}].label = this.value; saveLocalState();" 
             class="flex-1 p-2 sm:p-2.5 px-3 text-xs sm:text-sm font-black border-2 border-slate-200 rounded-xl bg-white outline-none focus:border-blue-500 uppercase uppercase-input" 
           />
           <input 
@@ -505,7 +698,7 @@
             placeholder="0.00" 
             onclick="this.select()"
             onfocus="this.select()"
-            oninput="closingState.madaMachines[${idx}].amount = parseFloat(this.value) || 0; calculateTotals(); saveData();" 
+            oninput="closingState.madaMachines[${idx}].amount = parseFloat(this.value) || 0; calculateTotals(); saveLocalState();" 
             class="w-32 sm:w-36 p-2 sm:p-2.5 px-3 text-xs sm:text-sm font-black border-2 border-slate-200 rounded-xl bg-white outline-none focus:border-blue-500 text-right font-mono" 
           />
           ${closingState.madaMachines.length > 1 ? `
@@ -521,21 +714,22 @@
       closingState.madaMachines.push({ label: `മെഷീൻ ${num} (MADA ${num})`, amount: 0 });
       renderMadaMachines();
       calculateTotals();
-      saveData();
+      saveLocalState();
     }
 
     function removeMadaMachine(idx) {
       closingState.madaMachines.splice(idx, 1);
       renderMadaMachines();
       calculateTotals();
-      saveData();
+      saveLocalState();
     }
 
+    // EXPENSES
     function renderExpensesTable() {
       const tbody = document.getElementById("expensesTableBody");
       tbody.innerHTML = "";
       if (closingState.expenses.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="4" class="p-3 text-center text-slate-400 font-bold">ചിലവുകൾ ഇല്ല</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="5" class="p-3 text-center text-slate-400 font-bold">ചിലവുകൾ ഇല്ല</td></tr>`;
         return;
       }
       closingState.expenses.forEach((item, idx) => {
@@ -544,6 +738,7 @@
           <td class="p-2 text-center text-slate-500">${idx + 1}</td>
           <td class="p-2 font-black text-slate-900">${item.desc}</td>
           <td class="p-2 text-right font-black text-amber-950 font-mono">${item.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+          <td class="p-2 text-right font-mono text-slate-600 font-bold">${item.remaining_due !== undefined ? item.remaining_due.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '-'}</td>
           <td class="p-2 text-center no-print"><button onclick="removeExpenseRow(${idx})" class="text-rose-500 hover:text-rose-700 font-black cursor-pointer p-1">✕</button></td>
         `;
         tbody.appendChild(tr);
@@ -551,27 +746,41 @@
     }
 
     function addExpenseRow() {
-      const descInput = document.getElementById("expDescInput");
-      const amtInput = document.getElementById("expAmtInput");
-      const desc = descInput.value.trim().toUpperCase();
-      const amt = parseFloat(amtInput.value) || 0;
+      const partyInp = document.getElementById("expPartyInput");
+      const amtInp = document.getElementById("expAmtInput");
+      const desc = partyInp.value.trim().toUpperCase();
+      const amt = parseFloat(amtInp.value) || 0;
 
       if (!desc || amt <= 0) return alert("വിവരണം തുകയും നൽകുക!");
-      closingState.expenses.push({ desc: desc, amount: amt });
-      descInput.value = "";
-      amtInput.value = "";
-      descInput.focus();
+
+      const type = selectedPartyObject ? selectedPartyObject.type : 'regular_expense';
+      const due = selectedPartyObject ? selectedPartyObject.due : 0;
+      const rem = Math.max(0, due - amt);
+
+      closingState.expenses.push({
+        desc: desc,
+        amount: amt,
+        type: type,
+        initial_due: due,
+        remaining_due: rem
+      });
+
+      partyInp.value = "";
+      amtInp.value = "";
+      selectedPartyObject = null;
+      document.getElementById("liveBalanceBadge").classList.add("hidden");
+      partyInp.focus();
 
       renderExpensesTable();
       calculateTotals();
-      saveData();
+      saveLocalState();
     }
 
     function removeExpenseRow(idx) {
       closingState.expenses.splice(idx, 1);
       renderExpensesTable();
       calculateTotals();
-      saveData();
+      saveLocalState();
     }
 
     function calculateTotals() {
@@ -593,6 +802,132 @@
       document.getElementById("finalGrandSale").innerText = grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 });
     }
 
+    // ==========================================
+    // ONE-CLICK SUBMIT TO CLOUD & MAIN LEDGER
+    // ==========================================
+    async function submitClosingToCloud() {
+      const selectedDate = document.getElementById("closingDate").value;
+      const counterCash = parseFloat(document.getElementById("counterCash").value) || 0;
+
+      let totalMada = 0;
+      closingState.madaMachines.forEach(m => totalMada += (m.amount || 0));
+      let totalExpenses = 0;
+      closingState.expenses.forEach(e => totalExpenses += (e.amount || 0));
+
+      const totalCashSale = counterCash + totalExpenses;
+      const grandTotal = totalCashSale + totalMada;
+
+      if (grandTotal <= 0 && closingState.expenses.length === 0) {
+        return alert("വിവരങ്ങൾ ഒന്നും രേഖപ്പെടുത്തിയിട്ടില്ല!");
+      }
+
+      if (!confirm(`⚠️ ${selectedDate} തീയതിയിലെ ക്ലോസിംഗ് കണക്കുകൾ സ്ഥിരീകരിച്ച് ക്ലൗഡ് ഡാറ്റാബേസിലേക്ക് പോസ്റ്റ് ചെയ്യണമോ?`)) {
+        return;
+      }
+
+      if (!supabaseClient) {
+        return alert("ക്ലൗഡ് ഡാറ്റാബേസ് കണക്ഷൻ ലഭ്യമല്ല!");
+      }
+
+      try {
+        // 1. Upsert into daily_closings
+        const closingPayload = {
+          date: selectedDate,
+          counter_cash: counterCash,
+          mada_machines: closingState.madaMachines,
+          expenses_list: closingState.expenses,
+          total_cash_sale: totalCashSale,
+          total_bank_sale: totalMada,
+          grand_total: grandTotal,
+          submitted_by: userRole === 'admin' ? 'admin' : (currentShop.name || 'cashier')
+        };
+
+        const { error: closeErr } = await supabaseClient
+          .from('daily_closings')
+          .upsert(closingPayload, { onConflict: 'date' });
+
+        if (closeErr) throw closeErr;
+
+        // 2. Clean previous closing batch transactions for this date
+        await supabaseClient
+          .from('transactions')
+          .delete()
+          .eq('date', selectedDate)
+          .in('party_name', ['DAILY CASH SALE (CLOSING)', 'MADA CARD SALE (CLOSING)']);
+
+        // 3. Post Transactions to Main Ledger
+        let batchTx = [];
+
+        // A. Daily Cash Sale
+        if (totalCashSale > 0) {
+          batchTx.push({
+            date: selectedDate,
+            type: 'sale',
+            party_name: 'DAILY CASH SALE (CLOSING)',
+            cash_amount: totalCashSale,
+            bank_amount: 0,
+            credit_amount: 0
+          });
+        }
+
+        // B. Daily Mada Bank Sale
+        if (totalMada > 0) {
+          batchTx.push({
+            date: selectedDate,
+            type: 'sale',
+            party_name: 'MADA CARD SALE (CLOSING)',
+            cash_amount: 0,
+            bank_amount: totalMada,
+            credit_amount: 0
+          });
+        }
+
+        // C. Individual Outflow Transactions
+        closingState.expenses.forEach(exp => {
+          if (exp.type === 'vendor') {
+            batchTx.push({
+              date: selectedDate,
+              type: 'purchase',
+              party_name: exp.desc,
+              cash_amount: -Math.abs(exp.amount),
+              bank_amount: 0,
+              credit_amount: 0
+            });
+          } else if (exp.type === 'employee') {
+            batchTx.push({
+              date: selectedDate,
+              type: 'salary',
+              party_name: `Staff: ${exp.desc}`,
+              cash_amount: -Math.abs(exp.amount),
+              bank_amount: 0,
+              credit_amount: 0
+            });
+          } else {
+            batchTx.push({
+              date: selectedDate,
+              type: 'expense',
+              party_name: exp.desc,
+              cash_amount: -Math.abs(exp.amount),
+              bank_amount: 0,
+              credit_amount: 0
+            });
+          }
+        });
+
+        if (batchTx.length > 0) {
+          const { error: txErr } = await supabaseClient.from('transactions').insert(batchTx);
+          if (txErr) throw txErr;
+        }
+
+        saveLocalState();
+        alert("🎉 ക്ലോസിംഗ് വിജയകരമായി പൂർത്തിയാക്കി! കണക്കുകൾ ക്ലൗഡ് ലെഡ്ജറിലേക്ക് പോസ്റ്റ് ചെയ്തു.");
+
+      } catch (err) {
+        alert("സബ്മിറ്റ് പിശക്: " + err.message);
+      }
+    }
+
+    // WHATSAPP
     function shareWhatsApp() {
       const dt = document.getElementById("closingDate").value;
       const shopName = currentShop ? currentShop.name.toUpperCase() : "ALNASSR";
@@ -609,7 +944,8 @@
       let expText = "";
       closingState.expenses.forEach(e => {
         totalExpenses += e.amount;
-        expText += `  ▫️ ${e.desc}: ${e.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}\n`;
+        let remStr = e.remaining_due !== undefined ? ` (ബാക്കി: ${e.remaining_due.toLocaleString('en-IN', { minimumFractionDigits: 2 })})` : '';
+        expText += `  ▫️ ${e.desc}: ${e.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}${remStr}\n`;
       });
 
       const totalCashSale = counterCash + totalExpenses;
@@ -632,20 +968,8 @@
       window.open('https://api.whatsapp.com/send?text=' + encodeURIComponent(text), '_blank');
     }
 
-    function resetDayData() {
-      if (!confirm("പുതിയ ദിവസത്തെ കണക്കുകൾ തുടങ്ങാൻ ഈ ഷോപ്പിലെ വിവരങ്ങൾ ക്ലിയർ ചെയ്യണമോ?")) return;
-      const shopId = currentShop ? currentShop.id : 'default';
-      closingState = {
-        date: getSaudiBusinessDate(),
-        counterCash: 0,
-        madaMachines: [{ label: "മെഷീൻ 1 (MADA 1)", amount: 0 }],
-        expenses: []
-      };
-      localStorage.removeItem(`ALNASSR_${shopId}_CLOSING`);
-      loadData();
-    }
-
     window.onload = function() {
+      document.getElementById("closingDate").value = getSaudiBusinessDate();
       checkLoginState();
       if (window.lucide) lucide.createIcons();
     };
