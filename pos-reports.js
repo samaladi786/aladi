@@ -1358,6 +1358,7 @@ async function requestRestoreBackup(event) {
           return alert("അസാധുവായ ബാക്കപ്പ് ഫയൽ!");
         }
 
+        // 1. ഫോൺ മെമ്മറി സെറ്റ് ചെയ്യുന്നു
         customersList = backupData.customers || [];
         vendorsList = backupData.vendors || [];
         employeesList = backupData.employees || [];
@@ -1366,22 +1367,15 @@ async function requestRestoreBackup(event) {
         transactionsList = backupData.transactions || [];
         if (backupData.opening_settings) openingSettings = backupData.opening_settings;
 
-        localStorage.setItem(`ALNASSR_${currentShopId}_CUSTOMERS`, JSON.stringify(customersList));
-        localStorage.setItem(`ALNASSR_${currentShopId}_VENDORS`, JSON.stringify(vendorsList));
-        localStorage.setItem(`ALNASSR_${currentShopId}_EMPLOYEES`, JSON.stringify(employeesList));
-        localStorage.setItem(`ALNASSR_${currentShopId}_EXPENSES`, JSON.stringify(expensesMasterList));
-        localStorage.setItem(`ALNASSR_${currentShopId}_AGENTS`, JSON.stringify(agentsList));
-        localStorage.setItem(`ALNASSR_${currentShopId}_TRANSACTIONS`, JSON.stringify(transactionsList));
-
-        // ക്ലൗഡ് ഡാറ്റാബേസിലേക്ക് (SUPABASE) സമ്പൂർണ്ണമായി അപ്‌ലോഡ് ചെയ്യുന്നു
+        // 2. ക്ലൗഡ് ഡാറ്റാബേസിലേക്ക് (SUPABASE) INSERT ചെയ്യുന്നു
         if (navigator.onLine && supabaseClient) {
-          alert("ക്ലൗഡ് ഡാറ്റാബേസിലേക്ക് എല്ലാ വിവരങ്ങളും റീസ്റ്റോർ ചെയ്യുന്നു. അല്പം കാത്തിരിക്കുക...");
+          alert("ക്ലൗഡ് ഡാറ്റാബേസിലേക്ക് ഡാറ്റ അപ്‌ലോഡ് ചെയ്യുന്നു. അല്പം കാത്തിരിക്കുക...");
 
           // A. Settings
           if (backupData.opening_settings) {
             try {
               const { data: setRow } = await supabaseClient.from('app_settings').select('*');
-              if (setRow && setRow[0]) {
+              if (setRow && setRow.length > 0) {
                 await supabaseClient.from('app_settings').update({
                   opening_cash: backupData.opening_settings.openingCash || 0,
                   opening_bank: backupData.opening_settings.openingBank || 0
@@ -1398,7 +1392,7 @@ async function requestRestoreBackup(event) {
           // B. Agents
           if (agentsList.length > 0) {
             const cleanAgents = agentsList.map(a => ({ name: (a.name || '').trim().toUpperCase() }));
-            await supabaseClient.from('agents').upsert(cleanAgents);
+            await supabaseClient.from('agents').insert(cleanAgents);
           }
 
           // C. Customers
@@ -1410,7 +1404,7 @@ async function requestRestoreBackup(event) {
               opening_balance: parseFloat(c.opening_balance) || 0,
               credit_limit: parseFloat(c.credit_limit) || 0
             }));
-            await supabaseClient.from('customers').upsert(cleanCust);
+            await supabaseClient.from('customers').insert(cleanCust);
           }
 
           // D. Vendors
@@ -1420,7 +1414,7 @@ async function requestRestoreBackup(event) {
               type: v.type || 'credit',
               opening_balance: parseFloat(v.opening_balance) || 0
             }));
-            await supabaseClient.from('vendors').upsert(cleanVend);
+            await supabaseClient.from('vendors').insert(cleanVend);
           }
 
           // E. Employees
@@ -1432,7 +1426,7 @@ async function requestRestoreBackup(event) {
               joining_date: em.joining_date || '',
               status: em.status || 'active'
             }));
-            await supabaseClient.from('employees').upsert(cleanEmp);
+            await supabaseClient.from('employees').insert(cleanEmp);
           }
 
           // F. Expenses Master
@@ -1442,26 +1436,31 @@ async function requestRestoreBackup(event) {
               type: ex.type || 'regular',
               opening_balance: parseFloat(ex.opening_balance) || 0
             }));
-            await supabaseClient.from('expenses_master').upsert(cleanExp);
+            await supabaseClient.from('expenses_master').insert(cleanExp);
           }
 
-          // G. Transactions (Chunked)
+          // G. Transactions (100 എണ്ണം വീതം ബാച്ച് ആയി കയറ്റുന്നു)
           if (transactionsList.length > 0) {
-            const chunkSize = 150;
+            const chunkSize = 100;
             for (let i = 0; i < transactionsList.length; i += chunkSize) {
               const chunk = transactionsList.slice(i, i + chunkSize).map(t => {
                 const { id, ...cleanT } = t;
                 return cleanT;
               });
-              await supabaseClient.from('transactions').upsert(chunk);
+              await supabaseClient.from('transactions').insert(chunk);
             }
+          }
+
+          // ക്ലൗഡിൽ നിന്ന് പുതിയ വിവരങ്ങൾ ലോഡ് ചെയ്യുന്നു
+          if (typeof fetchAllData === 'function') {
+            await fetchAllData();
           }
         }
 
         if (typeof populateDropdowns === 'function') populateDropdowns();
         if (typeof renderQuickTotalsAndRecent === 'function') renderQuickTotalsAndRecent();
         if (typeof closeBackupModal === 'function') closeBackupModal();
-        alert("🎉 അഭിനന്ദനങ്ങൾ! കസ്റ്റമർമാർ, വെണ്ടർമാർ, ജീവനക്കാർ, ഇടപാടുകൾ എന്നിവയെല്ലാം വിജയകരമായി ക്ലൗഡിലേക്കും ഫോണിലേക്കും റീസ്റ്റോർ ചെയ്തു!");
+        alert("🎉 ക്ലൗഡിലേക്കും ഫോണിലേക്കും വിജയകരമായി ബാക്കപ്പ് റീസ്റ്റോർ ചെയ്തു! ഇനി Ctrl + F5 അടിച്ചാലും ഡാറ്റ പോകില്ല.");
       } catch (errInner) {
         alert("റീസ്റ്റോർ പിശക്: " + errInner.message);
       }
