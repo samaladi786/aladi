@@ -384,7 +384,10 @@
         appEl.classList.add("hidden");
         setTimeout(() => {
           const inp = document.getElementById("loginPinInput");
-          if (inp) inp.focus();
+          if (inp) {
+            inp.focus();
+            inp.select();
+          }
         }, 150);
       }
     }
@@ -542,7 +545,7 @@
       }
     }
 
-    // SINGLE SEARCHABLE DROPDOWN LOGIC
+    // SINGLE SEARCHABLE DROPDOWN LOGIC (WITH NEW VENDOR / EXPENSE AUTO-CHOICE)
     function showPartyDropdown() {
       filterPartyDropdown(document.getElementById("expPartyInput").value);
     }
@@ -554,13 +557,7 @@
 
       const filtered = masterPartyCache.filter(p => p.name.includes(q) || p.label.includes(q));
 
-      if (filtered.length === 0) {
-        popup.classList.add("hidden");
-        selectedPartyObject = { name: q, type: 'regular_expense', due: 0 };
-        updateLiveRemainingPreview();
-        return;
-      }
-
+      // Show matched list
       filtered.slice(0, 15).forEach(p => {
         const item = document.createElement("div");
         item.className = "p-2.5 px-3 hover:bg-slate-100 cursor-pointer flex justify-between items-center text-xs font-bold";
@@ -571,6 +568,37 @@
         item.onmousedown = () => selectParty(p);
         popup.appendChild(item);
       });
+
+      // If typed query doesn't exactly match an existing party, show options to add as new vendor or general expense
+      if (q.length > 0) {
+        const hasExactMatch = masterPartyCache.some(p => p.name === q);
+        if (!hasExactMatch) {
+          // Option A: Add as New Vendor Purchase
+          const addVendOption = document.createElement("div");
+          addVendOption.className = "p-2.5 px-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-950 font-black cursor-pointer flex justify-between items-center text-xs border-t border-emerald-200";
+          addVendOption.innerHTML = `
+            <span>📦 "${q}" - പുതിയ വെണ്ടർ പർച്ചേസ് ആയി ചേർക്കുക</span>
+            <span class="text-[10px] bg-emerald-200 text-emerald-900 px-2 py-0.5 rounded">പുതിയ വെണ്ടർ</span>
+          `;
+          addVendOption.onmousedown = () => selectParty({ name: q, type: 'vendor', label: `[VENDOR] ${q}`, due: 0, isNew: true });
+          popup.appendChild(addVendOption);
+
+          // Option B: Add as General Expense
+          const addExpOption = document.createElement("div");
+          addExpOption.className = "p-2.5 px-3 bg-amber-50 hover:bg-amber-100 text-amber-950 font-black cursor-pointer flex justify-between items-center text-xs border-t border-amber-200";
+          addExpOption.innerHTML = `
+            <span>⚡ "${q}" - സാധാരണ ചിലവായി ചേർക്കുക</span>
+            <span class="text-[10px] bg-amber-200 text-amber-900 px-2 py-0.5 rounded">ചിലവ്</span>
+          `;
+          addExpOption.onmousedown = () => selectParty({ name: q, type: 'regular_expense', label: `[EXPENSE] ${q}`, due: 0 });
+          popup.appendChild(addExpOption);
+        }
+      }
+
+      if (filtered.length === 0 && q.length === 0) {
+        popup.classList.add("hidden");
+        return;
+      }
 
       popup.classList.remove("hidden");
     }
@@ -583,7 +611,7 @@
 
       const badge = document.getElementById("liveBalanceBadge");
       badge.classList.remove("hidden");
-      document.getElementById("lblCurrentDue").innerText = party.due.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+      document.getElementById("lblCurrentDue").innerText = (party.due || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 });
       updateLiveRemainingPreview();
 
       document.getElementById("expAmtInput").focus();
@@ -596,10 +624,10 @@
       }
       const badge = document.getElementById("liveBalanceBadge");
       badge.classList.remove("hidden");
-      document.getElementById("lblCurrentDue").innerText = selectedPartyObject.due.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+      document.getElementById("lblCurrentDue").innerText = (selectedPartyObject.due || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 });
 
       const amt = parseFloat(document.getElementById("expAmtInput").value) || 0;
-      const rem = Math.max(0, selectedPartyObject.due - amt);
+      const rem = Math.max(0, (selectedPartyObject.due || 0) - amt);
       document.getElementById("lblRemainingDue").innerText = rem.toLocaleString('en-IN', { minimumFractionDigits: 2 });
     }
 
@@ -739,7 +767,7 @@
           <td class="p-2 font-black text-slate-900">${item.desc}</td>
           <td class="p-2 text-right font-black text-amber-950 font-mono">${item.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
           <td class="p-2 text-right font-mono text-slate-600 font-bold">${item.remaining_due !== undefined ? item.remaining_due.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '-'}</td>
-          <td class="p-2 text-center no-print"><button onclick="removeExpenseRow(${idx})" class="text-rose-500 hover:text-rose-700 font-black cursor-pointer p-1">✕</button></td>
+          <td class="p-2 text-center no-print"><button onclick="removeExpenseRow(${idx})" title="ഈ വരി ഒഴിവാക്കുക" class="text-rose-500 hover:text-rose-700 font-black cursor-pointer p-1">✕</button></td>
         `;
         tbody.appendChild(tr);
       });
@@ -754,7 +782,8 @@
       if (!desc || amt <= 0) return alert("വിവരണം തുകയും നൽകുക!");
 
       const type = selectedPartyObject ? selectedPartyObject.type : 'regular_expense';
-      const due = selectedPartyObject ? selectedPartyObject.due : 0;
+      const due = selectedPartyObject ? (selectedPartyObject.due || 0) : 0;
+      const isNew = selectedPartyObject ? !!selectedPartyObject.isNew : false;
       const rem = Math.max(0, due - amt);
 
       closingState.expenses.push({
@@ -762,7 +791,8 @@
         amount: amt,
         type: type,
         initial_due: due,
-        remaining_due: rem
+        remaining_due: rem,
+        isNewVendor: isNew
       });
 
       partyInp.value = "";
@@ -776,6 +806,7 @@
       saveLocalState();
     }
 
+    // 100% SAFE LOCAL REMOVAL: ഒറിജിനൽ വെണ്ടറോ ഡാറ്റാബേസോ യാതൊരു കാരണവശാലും ഡിലീറ്റ് ആവില്ല
     function removeExpenseRow(idx) {
       closingState.expenses.splice(idx, 1);
       renderExpensesTable();
@@ -803,7 +834,7 @@
     }
 
     // ==========================================
-    // ONE-CLICK SUBMIT TO CLOUD & MAIN LEDGER
+    // SUBMIT TO CLOUD & COMPLETE CLEAN SLATE RESET
     // ==========================================
     async function submitClosingToCloud() {
       const selectedDate = document.getElementById("closingDate").value;
@@ -830,7 +861,25 @@
       }
 
       try {
-        // 1. Upsert into daily_closings
+        // 1. If any new vendor was entered, safely create them in vendors table
+        for (const exp of closingState.expenses) {
+          if (exp.type === 'vendor' && exp.isNewVendor) {
+            try {
+              const { data: vCheck } = await supabaseClient.from('vendors').select('id').eq('name', exp.desc).maybeSingle();
+              if (!vCheck) {
+                await supabaseClient.from('vendors').insert([{
+                  name: exp.desc,
+                  type: 'credit',
+                  opening_balance: 0
+                }]);
+              }
+            } catch (vErr) {
+              console.warn("Auto-create vendor note:", vErr);
+            }
+          }
+        }
+
+        // 2. Upsert into daily_closings
         const closingPayload = {
           date: selectedDate,
           counter_cash: counterCash,
@@ -848,14 +897,14 @@
 
         if (closeErr) throw closeErr;
 
-        // 2. Clean previous closing batch transactions for this date
+        // 3. Clean previous closing batch transactions for this date
         await supabaseClient
           .from('transactions')
           .delete()
           .eq('date', selectedDate)
           .in('party_name', ['DAILY CASH SALE (CLOSING)', 'MADA CARD SALE (CLOSING)']);
 
-        // 3. Post Transactions to Main Ledger
+        // 4. Post Transactions to Main Ledger
         let batchTx = [];
 
         // A. Daily Cash Sale
@@ -919,8 +968,28 @@
           if (txErr) throw txErr;
         }
 
-        saveLocalState();
-        alert("🎉 ക്ലോസിംഗ് വിജയകരമായി പൂർത്തിയാക്കി! കണക്കുകൾ ക്ലൗഡ് ലെഡ്ജറിലേക്ക് പോസ്റ്റ് ചെയ്തു.");
+        // 5. സമ്പൂർണ്ണ ക്ലീൻ സ്ലേറ്റ് (Full Clean Slate Reset)
+        const shopId = currentShop ? currentShop.id : 'default';
+        localStorage.removeItem(`ALNASSR_${shopId}_CLOSING_${selectedDate}`);
+
+        closingState = {
+          date: getSaudiBusinessDate(),
+          counterCash: 0,
+          madaMachines: [{ label: "മെഷീൻ 1 (MADA 1)", amount: 0 }],
+          expenses: []
+        };
+
+        // Reset All UI Inputs to Blank
+        document.getElementById("counterCash").value = "";
+        document.getElementById("expPartyInput").value = "";
+        document.getElementById("expAmtInput").value = "";
+        selectedPartyObject = null;
+        document.getElementById("liveBalanceBadge").classList.add("hidden");
+
+        populateUIFromState();
+        fetchMasterPartiesWithBalances();
+
+        alert("🎉 ക്ലോസിംഗ് വിജയകരമായി ക്ലൗഡിൽ പോസ്റ്റ് ചെയ്തു! സ്ക്രീൻ അടുത്ത ദിവസത്തിനായി പൂർണ്ണമായി ക്ലീൻ ചെയ്തു.");
 
       } catch (err) {
         alert("സബ്മിറ്റ് പിശക്: " + err.message);
