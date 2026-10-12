@@ -22,10 +22,15 @@
 
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@500;700;800;900&family=Noto+Sans+Malayalam:wght@500;700;900&display=swap');
-    body { font-family: 'Manrope', 'Noto Sans Malayalam', sans-serif; }
+    body { 
+      font-family: 'Manrope', 'Noto Sans Malayalam', sans-serif; 
+      -webkit-tap-highlight-color: transparent;
+    }
     input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
     input[type=number] { -moz-appearance: textfield; }
+    .uppercase-input { text-transform: uppercase; }
 
+    /* COMPACT A4 PRINT SETUP (SINGLE PAGE) */
     @media print {
       @page { size: A4 portrait; margin: 8mm 10mm; }
       .no-print { display: none !important; }
@@ -36,14 +41,14 @@
     }
   </style>
 </head>
-<body class="bg-slate-100 text-slate-800 min-h-screen p-2 sm:p-5 text-xs flex flex-col justify-center items-center">
+<body class="bg-slate-100 text-slate-800 min-h-screen p-2.5 sm:p-5 text-xs flex flex-col justify-center items-center">
 
   <!-- ========================================== -->
   <!-- 1. LOGIN SCREEN (4-DIGIT AUTO-SUBMIT)      -->
   <!-- ========================================== -->
   <div id="loginScreen" class="w-full max-w-sm bg-white p-6 rounded-3xl shadow-2xl border border-slate-200 text-center space-y-4">
-    <div class="w-14 h-14 bg-emerald-100 text-emerald-700 rounded-2xl flex items-center justify-center mx-auto shadow-inner">
-      <i data-lucide="lock" class="w-7 h-7"></i>
+    <div class="w-16 h-16 bg-emerald-100 text-emerald-700 rounded-2xl flex items-center justify-center mx-auto shadow-inner">
+      <i data-lucide="lock" class="w-8 h-8"></i>
     </div>
     <div>
       <h2 class="text-base font-black text-slate-900 uppercase">ക്യാഷ് ക്ലോസിംഗ് ലോഗിൻ</h2>
@@ -60,14 +65,14 @@
         onclick="this.select()"
         onfocus="this.select()"
         oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 4); if(this.value.length === 4) { verifyLogin(); }"
-        class="w-full text-center text-3xl font-black tracking-[0.3em] p-2.5 rounded-2xl border-2 border-slate-300 bg-slate-50 outline-none focus:border-emerald-600 focus:bg-white transition cursor-pointer"
+        class="w-full text-center text-3xl font-black tracking-[0.35em] p-3 rounded-2xl border-2 border-slate-300 bg-slate-50 outline-none focus:border-emerald-600 focus:bg-white transition cursor-pointer"
         onkeydown="if(event.key === 'Enter') verifyLogin();"
       />
     </div>
     <button 
       type="button" 
       onclick="verifyLogin()" 
-      class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-black text-xs rounded-xl shadow-lg shadow-emerald-600/30 transition cursor-pointer">
+      class="w-full py-3 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-black text-xs rounded-xl shadow-lg shadow-emerald-600/30 transition cursor-pointer">
       ലോഗിൻ ചെയ്യുക
     </button>
   </div>
@@ -75,27 +80,27 @@
   <!-- ========================================== -->
   <!-- 2. MAIN APP CONTAINER                      -->
   <!-- ========================================== -->
-  <div id="appContainer" class="w-full max-w-2xl bg-white rounded-2xl shadow-lg border border-slate-200 p-4 sm:p-6 print-border space-y-3.5 hidden">
+  <div id="appContainer" class="w-full max-w-2xl bg-white rounded-3xl shadow-lg border border-slate-200 p-4 sm:p-6 print-border space-y-4 hidden my-auto">
     
     <!-- TOP CONTROLS (SHOP SELECTOR, DATE & LOGOUT) -->
-    <div class="no-print bg-slate-50 p-2.5 rounded-xl border border-slate-200 flex flex-wrap justify-between items-center gap-2">
+    <div class="no-print bg-slate-50 p-3 rounded-2xl border border-slate-200 flex flex-wrap justify-between items-center gap-2">
       <div class="flex items-center gap-2">
         <label class="font-black text-slate-700">ഷോപ്പ്:</label>
-        <select id="shopSelector" onchange="onShopChange()" class="p-1.5 px-3 border border-slate-300 rounded-lg font-black bg-white outline-none cursor-pointer">
+        <select id="shopSelector" onchange="onShopChange()" class="p-2 px-3 border border-slate-300 rounded-xl font-black bg-white outline-none cursor-pointer text-xs">
         </select>
-        <span id="shopFixedBadge" class="hidden font-black text-xs text-emerald-800 bg-emerald-100 px-2.5 py-1 rounded-lg"></span>
+        <span id="shopFixedBadge" class="hidden font-black text-xs text-emerald-800 bg-emerald-100 px-3 py-1.5 rounded-xl border border-emerald-300"></span>
       </div>
 
       <div class="flex items-center gap-2">
-        <button id="pwaInstallBtn" onclick="triggerPwaInstall()" class="hidden px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-lg text-[11px] shadow flex items-center gap-1 cursor-pointer">
-          <i data-lucide="download" class="w-3.5 h-3.5"></i> ആപ്പ് ഇൻസ്റ്റാൾ ചെയ്യുക
+        <button id="pwaInstallBtn" onclick="triggerPwaInstall()" class="hidden px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-xl text-[11px] shadow flex items-center gap-1 cursor-pointer">
+          <i data-lucide="download" class="w-3.5 h-3.5"></i> ആപ്പ് ഇൻസ്റ്റാൾ
         </button>
 
         <label class="font-black text-slate-700">തീയതി:</label>
-        <input type="date" id="closingDate" onchange="saveData()" class="p-1 px-2 border border-slate-300 rounded-lg font-black bg-white outline-none cursor-pointer" />
+        <input type="date" id="closingDate" onchange="saveData()" class="p-1.5 px-2.5 border border-slate-300 rounded-xl font-black bg-white outline-none cursor-pointer text-xs" />
         
-        <button onclick="logoutApp()" title="ലോഗൗട്ട്" class="p-1 px-2 text-rose-600 hover:bg-rose-50 rounded-lg border border-rose-200 font-bold transition flex items-center gap-1 cursor-pointer">
-          <i data-lucide="log-out" class="w-3.5 h-3.5"></i>
+        <button onclick="logoutApp()" title="ലോഗൗട്ട്" class="p-2 text-rose-600 hover:bg-rose-50 rounded-xl border border-rose-200 font-bold transition flex items-center gap-1 cursor-pointer">
+          <i data-lucide="log-out" class="w-4 h-4"></i>
         </button>
       </div>
     </div>
@@ -115,102 +120,113 @@
       </div>
     </div>
 
-    <!-- 1. COUNTER CASH -->
-    <div class="bg-emerald-50/70 p-2.5 rounded-xl border border-emerald-300 print-box flex justify-between items-center">
-      <span class="font-black text-emerald-950 text-xs">💵 കൗണ്ടറിലുള്ള ക്യാഷ് (Cash in Drawer):</span>
-      <div class="w-40 sm:w-48">
+    <!-- 1. COUNTER CASH (BIGGER INPUT) -->
+    <div class="bg-emerald-50/70 p-3 sm:p-3.5 rounded-2xl border-2 border-emerald-300 print-box flex flex-wrap justify-between items-center gap-2">
+      <span class="font-black text-emerald-950 text-xs sm:text-sm">💵 കൗണ്ടറിലുള്ള ക്യാഷ് (Cash in Drawer):</span>
+      <div class="w-full sm:w-52">
         <input 
           type="number" 
           step="any" 
           id="counterCash" 
           placeholder="0.00" 
+          onclick="this.select()"
+          onfocus="this.select()"
           oninput="calculateTotals(); saveData();" 
-          class="w-full text-right text-sm font-black p-1.5 px-3 rounded-lg border border-emerald-400 bg-white outline-none focus:ring-1 focus:ring-emerald-600 text-emerald-950 font-mono" 
+          class="w-full text-right text-base sm:text-lg font-black p-2.5 px-3.5 rounded-xl border-2 border-emerald-400 bg-white outline-none focus:ring-2 focus:ring-emerald-600 text-emerald-950 font-mono shadow-sm cursor-pointer" 
         />
       </div>
     </div>
 
-    <!-- 2. MADA POS MACHINES -->
-    <div class="bg-blue-50/70 p-2.5 rounded-xl border border-blue-300 print-box space-y-2">
+    <!-- 2. MADA POS MACHINES (BIGGER INPUTS & AUTO UPPERCASE) -->
+    <div class="bg-blue-50/70 p-3 sm:p-3.5 rounded-2xl border-2 border-blue-300 print-box space-y-2.5">
       <div class="flex justify-between items-center">
-        <span class="font-black text-blue-950 text-xs">💳 മദാ കാർഡ് മെഷീനുകൾ (Mada POS LDR):</span>
-        <button type="button" onclick="addMadaMachine()" class="no-print bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-[11px] px-2.5 py-1 rounded-lg shadow transition flex items-center gap-1 cursor-pointer">
+        <span class="font-black text-blue-950 text-xs sm:text-sm">💳 മദാ കാർഡ് മെഷീനുകൾ (Mada POS LDR):</span>
+        <button type="button" onclick="addMadaMachine()" class="no-print bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs px-3 py-1.5 rounded-xl shadow transition flex items-center gap-1 cursor-pointer">
           <i data-lucide="plus-circle" class="w-3.5 h-3.5"></i> + മെഷീൻ
         </button>
       </div>
 
-      <div id="madaMachinesList" class="space-y-1.5"></div>
+      <div id="madaMachinesList" class="space-y-2"></div>
 
-      <div class="flex justify-between items-center pt-1.5 border-t border-blue-200 text-xs font-black text-blue-950">
+      <div class="flex justify-between items-center pt-2 border-t border-blue-200 text-xs font-black text-blue-950">
         <span>ആകെ മദാ ബാങ്ക് (Total Mada):</span>
-        <span id="displayTotalMada" class="text-xs text-blue-900 font-mono">0.00</span>
+        <span id="displayTotalMada" class="text-xs sm:text-sm text-blue-900 font-mono font-black">0.00</span>
       </div>
     </div>
 
-    <!-- 3. EXPENSES -->
-    <div class="bg-amber-50/70 p-2.5 rounded-xl border border-amber-300 print-box space-y-2">
-      <span class="font-black text-amber-950 text-xs block">⚡ പെട്ടിയിൽ നിന്നുള്ള ചിലവുകൾ / പർച്ചേസ് (Expenses):</span>
+    <!-- 3. EXPENSES (MOBILE-FRIENDLY QUICK ENTRY & AUTO UPPERCASE) -->
+    <div class="bg-amber-50/70 p-3 sm:p-3.5 rounded-2xl border-2 border-amber-300 print-box space-y-2.5">
+      <span class="font-black text-amber-950 text-xs sm:text-sm block">⚡ പെട്ടിയിൽ നിന്നുള്ള ചിലവുകൾ / പർച്ചേസ് (Expenses):</span>
 
-      <div class="no-print bg-white p-2 rounded-lg border border-amber-300 flex gap-2 items-center">
+      <!-- Mobile-Friendly Touch-Optimized Entry Box -->
+      <div class="no-print bg-white p-2.5 rounded-2xl border-2 border-amber-300 shadow-sm flex flex-col sm:flex-row gap-2 items-stretch sm:items-center">
         <input 
           type="text" 
           id="expDescInput" 
           placeholder="ഇനം / വിവരണം..." 
-          class="flex-1 p-1 px-2 text-xs font-bold border rounded outline-none uppercase" 
+          onclick="this.select()"
+          onfocus="this.select()"
+          oninput="this.value = this.value.toUpperCase();"
+          class="flex-1 p-2.5 px-3 text-xs sm:text-sm font-black border-2 border-slate-200 rounded-xl outline-none focus:border-amber-500 uppercase uppercase-input" 
           onkeydown="if(event.key === 'Enter') document.getElementById('expAmtInput').focus();"
         />
-        <input 
-          type="number" 
-          step="any" 
-          id="expAmtInput" 
-          placeholder="തുക" 
-          class="w-28 p-1 px-2 text-xs font-black border rounded outline-none text-right font-mono" 
-          onkeydown="if(event.key === 'Enter') addExpenseRow();"
-        />
-        <button type="button" onclick="addExpenseRow()" class="bg-amber-600 hover:bg-amber-700 text-white font-black text-xs px-3 py-1 rounded shadow cursor-pointer">
-          + ചേർക്കുക
-        </button>
+        <div class="flex gap-2">
+          <input 
+            type="number" 
+            step="any" 
+            id="expAmtInput" 
+            placeholder="തുക" 
+            onclick="this.select()"
+            onfocus="this.select()"
+            class="flex-1 sm:w-32 p-2.5 px-3 text-xs sm:text-sm font-black border-2 border-slate-200 rounded-xl outline-none focus:border-amber-500 text-right font-mono" 
+            onkeydown="if(event.key === 'Enter') addExpenseRow();"
+          />
+          <button type="button" onclick="addExpenseRow()" class="bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white font-black text-xs sm:text-sm px-4 py-2.5 rounded-xl shadow cursor-pointer whitespace-nowrap">
+            + ചേർക്കുക
+          </button>
+        </div>
       </div>
 
-      <table class="w-full text-left border-collapse print-table bg-white rounded-lg overflow-hidden border border-amber-200">
+      <!-- Compact Expenses Table -->
+      <table class="w-full text-left border-collapse print-table bg-white rounded-xl overflow-hidden border border-amber-200">
         <thead>
           <tr class="bg-amber-100 text-amber-950 font-black text-[11px] border-b">
-            <th class="p-1.5 w-8 text-center">#</th>
-            <th class="p-1.5">ഇനം / വിവരണം</th>
-            <th class="p-1.5 text-right w-28">തുക</th>
-            <th class="p-1.5 text-center w-8 no-print">✕</th>
+            <th class="p-2 w-8 text-center">#</th>
+            <th class="p-2">ഇനം / വിവരണം</th>
+            <th class="p-2 text-right w-32">തുക</th>
+            <th class="p-2 text-center w-10 no-print">✕</th>
           </tr>
         </thead>
         <tbody id="expensesTableBody" class="font-bold text-[11px] divide-y divide-slate-100"></tbody>
         <tfoot>
           <tr class="font-black text-[11px] bg-amber-100/70 border-t">
-            <td colspan="2" class="p-1.5 uppercase text-amber-950">ആകെ ചിലവുകൾ (Total Outflow):</td>
-            <td id="displayTotalExpenses" class="p-1.5 text-right text-amber-900 font-mono text-xs">0.00</td>
+            <td colspan="2" class="p-2 uppercase text-amber-950">ആകെ ചിലവുകൾ (Total Outflow):</td>
+            <td id="displayTotalExpenses" class="p-2 text-right text-amber-900 font-mono text-xs font-black">0.00</td>
             <td class="no-print"></td>
           </tr>
         </tfoot>
       </table>
     </div>
 
-    <!-- 4. FINAL SUMMARY -->
-    <div class="bg-slate-900 text-white p-3 sm:p-4 rounded-xl space-y-2 print-box border border-slate-950">
-      <div class="flex justify-between items-center text-emerald-400 border-b border-slate-800 pb-1 text-xs">
+    <!-- 4. FINAL SUMMARY (NO CURRENCY SYMBOLS) -->
+    <div class="bg-slate-900 text-white p-3.5 sm:p-4 rounded-2xl space-y-2 print-box border border-slate-950 shadow-md">
+      <div class="flex justify-between items-center text-emerald-400 border-b border-slate-800 pb-1.5 text-xs sm:text-sm">
         <span class="font-bold">1. ടോട്ടൽ ക്യാഷ് സെയിൽ (Cash + Expenses):</span>
-        <span id="finalCashSale" class="font-black font-mono text-sm">0.00</span>
+        <span id="finalCashSale" class="font-black font-mono text-sm sm:text-base">0.00</span>
       </div>
 
-      <div class="flex justify-between items-center text-blue-400 border-b border-slate-800 pb-1 text-xs">
+      <div class="flex justify-between items-center text-blue-400 border-b border-slate-800 pb-1.5 text-xs sm:text-sm">
         <span class="font-bold">2. ടോട്ടൽ ബാങ്ക് സെയിൽ (Total Mada POS):</span>
-        <span id="finalBankSale" class="font-black font-mono text-sm">0.00</span>
+        <span id="finalBankSale" class="font-black font-mono text-sm sm:text-base">0.00</span>
       </div>
 
-      <div class="flex justify-between items-center text-amber-400 pt-1 text-sm font-black">
+      <div class="flex justify-between items-center text-amber-400 pt-1 text-sm sm:text-base font-black">
         <span>⭐ ആകെ കച്ചവടം (GRAND TOTAL SALES):</span>
-        <span id="finalGrandSale" class="font-mono text-base underline decoration-double">0.00</span>
+        <span id="finalGrandSale" class="font-mono text-base sm:text-lg underline decoration-double">0.00</span>
       </div>
     </div>
 
-    <!-- SIGNATURES -->
+    <!-- SIGNATURES (PRINT ONLY) -->
     <div class="pt-6 border-t border-slate-800 justify-between items-end text-[11px] font-black hidden print:flex">
       <div class="text-center">
         ...................................................<br>ക്യാഷ്യറുടെ ഒപ്പ്
@@ -222,16 +238,16 @@
 
     <!-- ACTION BUTTONS -->
     <div class="no-print flex flex-wrap gap-2 justify-center pt-2 border-t border-slate-200">
-      <button onclick="window.print()" class="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-xs rounded-xl shadow transition flex items-center gap-1.5 cursor-pointer">
-        <i data-lucide="printer" class="w-3.5 h-3.5"></i> 🖨️ A4 പ്രിന്റ്
+      <button onclick="window.print()" class="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-xs rounded-xl shadow transition flex items-center gap-1.5 cursor-pointer">
+        <i data-lucide="printer" class="w-4 h-4"></i> 🖨️ A4 പ്രിന്റ്
       </button>
 
-      <button onclick="shareWhatsApp()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl shadow transition flex items-center gap-1.5 cursor-pointer">
-        <i data-lucide="share-2" class="w-3.5 h-3.5"></i> 🟢 വാട്‌സ്ആപ്പ്
+      <button onclick="shareWhatsApp()" class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl shadow transition flex items-center gap-1.5 cursor-pointer">
+        <i data-lucide="share-2" class="w-4 h-4"></i> 🟢 വാട്‌സ്ആപ്പ്
       </button>
 
-      <button onclick="resetDayData()" class="px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs rounded-xl shadow transition flex items-center gap-1.5 cursor-pointer">
-        <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i> 🔄 ക്ലിയർ (New Day)
+      <button onclick="resetDayData()" class="px-3.5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs rounded-xl shadow transition flex items-center gap-1.5 cursor-pointer">
+        <i data-lucide="rotate-ccw" class="w-4 h-4"></i> 🔄 ക്ലിയർ (New Day)
       </button>
     </div>
 
@@ -312,7 +328,7 @@
     var closingState = {
       date: getSaudiBusinessDate(),
       counterCash: 0,
-      madaMachines: [{ label: "മെഷീൻ 1 (Mada 1)", amount: 0 }],
+      madaMachines: [{ label: "മെഷീൻ 1 (MADA 1)", amount: 0 }],
       expenses: []
     };
 
@@ -445,7 +461,7 @@
         closingState = {
           date: defaultDate,
           counterCash: 0,
-          madaMachines: [{ label: "മെഷീൻ 1 (Mada 1)", amount: 0 }],
+          madaMachines: [{ label: "മെഷീൻ 1 (MADA 1)", amount: 0 }],
           expenses: []
         };
       }
@@ -472,11 +488,29 @@
       container.innerHTML = "";
       closingState.madaMachines.forEach((m, idx) => {
         const row = document.createElement("div");
-        row.className = "flex items-center gap-1.5";
+        row.className = "flex items-center gap-2";
         row.innerHTML = `
-          <input type="text" value="${m.label}" onchange="closingState.madaMachines[${idx}].label = this.value; saveData();" class="flex-1 p-1 px-2 text-xs font-bold border rounded bg-white outline-none" />
-          <input type="number" step="any" value="${m.amount || ''}" placeholder="0.00" oninput="closingState.madaMachines[${idx}].amount = parseFloat(this.value) || 0; calculateTotals(); saveData();" class="w-32 p-1 px-2 text-xs font-black border rounded bg-white outline-none text-right font-mono" />
-          ${closingState.madaMachines.length > 1 ? `<button type="button" onclick="removeMadaMachine(${idx})" class="no-print text-rose-500 hover:text-rose-700 p-1 font-black cursor-pointer">✕</button>` : `<div class="w-4 no-print"></div>`}
+          <input 
+            type="text" 
+            value="${m.label}" 
+            onclick="this.select()"
+            onfocus="this.select()"
+            oninput="this.value = this.value.toUpperCase(); closingState.madaMachines[${idx}].label = this.value; saveData();" 
+            class="flex-1 p-2 sm:p-2.5 px-3 text-xs sm:text-sm font-black border-2 border-slate-200 rounded-xl bg-white outline-none focus:border-blue-500 uppercase uppercase-input" 
+          />
+          <input 
+            type="number" 
+            step="any" 
+            value="${m.amount || ''}" 
+            placeholder="0.00" 
+            onclick="this.select()"
+            onfocus="this.select()"
+            oninput="closingState.madaMachines[${idx}].amount = parseFloat(this.value) || 0; calculateTotals(); saveData();" 
+            class="w-32 sm:w-36 p-2 sm:p-2.5 px-3 text-xs sm:text-sm font-black border-2 border-slate-200 rounded-xl bg-white outline-none focus:border-blue-500 text-right font-mono" 
+          />
+          ${closingState.madaMachines.length > 1 ? `
+            <button type="button" onclick="removeMadaMachine(${idx})" class="no-print text-rose-500 hover:text-rose-700 p-2 font-black cursor-pointer text-sm">✕</button>
+          ` : `<div class="w-6 no-print"></div>`}
         `;
         container.appendChild(row);
       });
@@ -484,7 +518,7 @@
 
     function addMadaMachine() {
       const num = closingState.madaMachines.length + 1;
-      closingState.madaMachines.push({ label: `മെഷീൻ ${num} (Mada ${num})`, amount: 0 });
+      closingState.madaMachines.push({ label: `മെഷീൻ ${num} (MADA ${num})`, amount: 0 });
       renderMadaMachines();
       calculateTotals();
       saveData();
@@ -501,16 +535,16 @@
       const tbody = document.getElementById("expensesTableBody");
       tbody.innerHTML = "";
       if (closingState.expenses.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="4" class="p-2 text-center text-slate-400 font-bold">ചിലവുകൾ ഇല്ല</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="4" class="p-3 text-center text-slate-400 font-bold">ചിലവുകൾ ഇല്ല</td></tr>`;
         return;
       }
       closingState.expenses.forEach((item, idx) => {
         const tr = document.createElement("tr");
         tr.innerHTML = `
-          <td class="p-1.5 text-center text-slate-500">${idx + 1}</td>
-          <td class="p-1.5 font-black text-slate-900">${item.desc}</td>
-          <td class="p-1.5 text-right font-black text-amber-950 font-mono">${item.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
-          <td class="p-1.5 text-center no-print"><button onclick="removeExpenseRow(${idx})" class="text-rose-500 hover:text-rose-700 font-black cursor-pointer">✕</button></td>
+          <td class="p-2 text-center text-slate-500">${idx + 1}</td>
+          <td class="p-2 font-black text-slate-900">${item.desc}</td>
+          <td class="p-2 text-right font-black text-amber-950 font-mono">${item.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+          <td class="p-2 text-center no-print"><button onclick="removeExpenseRow(${idx})" class="text-rose-500 hover:text-rose-700 font-black cursor-pointer p-1">✕</button></td>
         `;
         tbody.appendChild(tr);
       });
@@ -604,7 +638,7 @@
       closingState = {
         date: getSaudiBusinessDate(),
         counterCash: 0,
-        madaMachines: [{ label: "മെഷീൻ 1 (Mada 1)", amount: 0 }],
+        madaMachines: [{ label: "മെഷീൻ 1 (MADA 1)", amount: 0 }],
         expenses: []
       };
       localStorage.removeItem(`ALNASSR_${shopId}_CLOSING`);
