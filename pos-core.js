@@ -65,7 +65,7 @@ function triggerPwaInstall() {
   });
 }
 
-// SAUDI BUSINESS DATE (6:00 AM CUT-OFF SYNC)
+// SAUDI BUSINESS DATE (8:00 AM CUT-OFF SYNC)
 function getSaudiBusinessDate() {
   try {
     const now = new Date();
@@ -2362,14 +2362,20 @@ async function saveEditedMasterItem() {
     if (!item) return;
     const payload = { name: newName };
     if (navigator.onLine && supabaseClient) {
-      // Syntax error FIXED below: added the missing fallback ternary branch
       const { error } = item.id 
         ? await supabaseClient.from('agents').update(payload).eq('id', item.id)
         : await supabaseClient.from('agents').update(payload).eq('name', originalName);
       if (error) return alert("ക്ലൗഡിലേക്ക് സേവ് ചെയ്യാൻ കഴിഞ്ഞില്ല: " + error.message);
+
+      // ഈ ഏജന്റിന് കീഴിലുള്ള എല്ലാ കസ്റ്റമർമാരെയും ഓട്ടോമാറ്റിക്കായി പുതിയ പേരിലേക്ക് മാറ്റുന്നു:
+      await supabaseClient.from('customers').update({ agent_name: newName }).eq('agent_name', originalName);
     }
     item.name = newName;
+    customersList.forEach(c => {
+      if (c && c.agent_name === originalName) c.agent_name = newName;
+    });
     localStorage.setItem(`ALNASSR_${currentShopId}_AGENTS`, JSON.stringify(agentsList));
+    localStorage.setItem(`ALNASSR_${currentShopId}_CUSTOMERS`, JSON.stringify(customersList));
   } else if (type === 'expense') {
     const item = expensesMasterList.find(ex => ex.name === originalName);
     if (!item) return;
