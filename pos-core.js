@@ -70,7 +70,7 @@ function getSaudiBusinessDate() {
   try {
     const now = new Date();
     const saudiTime = new Date(now.getTime() + (now.getTimezoneOffset() + 180) * 60000);
-    if (saudiTime.getHours() < 6) {
+    if (saudiTime.getHours() < 8) {
       saudiTime.setDate(saudiTime.getDate() - 1);
     }
     const y = saudiTime.getFullYear();
