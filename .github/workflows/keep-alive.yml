@@ -1,0 +1,35 @@
+name: Supabase Keep Alive (All Shops)
+
+on:
+  schedule:
+    # ഓരോ 3 ദിവസത്തിലും സൗദി സമയം ഉച്ചയ്ക്ക് 12:00 മണിക്ക് തനിയെ റൺ ആകുന്നു (UTC 09:00)
+    - cron: '0 9 */3 * *'
+  workflow_dispatch:
+
+jobs:
+  ping-all-supabase-projects:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Shop 1 (NASSER SUPERMARKET)
+        run: |
+          curl -s -X GET "https://elubqoicerkldrufqcbj.supabase.co/rest/v1/customers?select=id&limit=1" \
+          -H "apikey: sb_publishable_zsEKreCmounELozZ5EQ3Lg_aXyut9EK" \
+          -H "Authorization: Bearer sb_publishable_zsEKreCmounELozZ5EQ3Lg_aXyut9EK"
+
+      - name: Ping Shop 2 (BOOFIYA)
+        run: |
+          curl -s -X GET "https://qkjcviszzdptssvpguwc.supabase.co/rest/v1/customers?select=id&limit=1" \
+          -H "apikey: sb_publishable_J0Z4b7NoP3VuDKdbC0WeIg_OQAlpnLQ" \
+          -H "Authorization: Bearer sb_publishable_J0Z4b7NoP3VuDKdbC0WeIg_OQAlpnLQ"
+
+      - name: Ping Shop 3 (TAJ SPORTS)
+        run: |
+          curl -s -X GET "https://garpkohthpeirdhcwthk.supabase.co/rest/v1/customers?select=id&limit=1" \
+          -H "apikey: sb_publishable_TNhOZnpYuthYHmSJSlyhaw_R6RS1jcY" \
+          -H "Authorization: Bearer sb_publishable_TNhOZnpYuthYHmSJSlyhaw_R6RS1jcY"
+
+      - name: Ping Shop 4 (MUSAD SPORTS)
+        run: |
+          curl -s -X GET "https://mwxbakqoipcwblhukrfs.supabase.co/rest/v1/customers?select=id&limit=1" \
+          -H "apikey: sb_publishable_OfuR1PeffNa4NWUhpwV3gg_pwqovQZT" \
+          -H "Authorization: Bearer sb_publishable_OfuR1PeffNa4NWUhpwV3gg_pwqovQZT"
