@@ -44,7 +44,7 @@
     }
   </style>
 </head>
-<body class="bg-slate-100 text-slate-800 min-h-screen p-2.5 sm:p-5 text-xs flex flex-col justify-center items-center">
+<body class="bg-slate-100 text-slate-800 min-h-screen p-2 sm:p-4 text-xs flex flex-col justify-center items-center">
 
   <!-- ========================================== -->
   <!-- 1. LOGIN SCREEN (4-DIGIT AUTO-SUBMIT)      -->
@@ -83,20 +83,20 @@
   <!-- ========================================== -->
   <!-- 2. MAIN APP CONTAINER (ACTIVE ENTRY PAD)   -->
   <!-- ========================================== -->
-  <div id="appContainer" class="w-full max-w-2xl bg-white rounded-3xl shadow-lg border border-slate-200 p-4 sm:p-6 print-border space-y-4 hidden my-auto relative">
+  <div id="appContainer" class="w-full max-w-2xl bg-white rounded-3xl shadow-lg border border-slate-200 p-3 sm:p-5 print-border space-y-3.5 hidden my-auto relative">
     
     <!-- TOP CONTROLS (SHOP SELECTOR, NAV & HISTORY) -->
-    <div class="no-print bg-slate-50 p-3 rounded-2xl border border-slate-200 flex flex-wrap justify-between items-center gap-2">
+    <div class="no-print bg-slate-50 p-2.5 sm:p-3 rounded-2xl border border-slate-200 flex flex-wrap justify-between items-center gap-2">
       <div class="flex items-center gap-2">
         <label class="font-black text-slate-700">ഷോപ്പ്:</label>
-        <select id="shopSelector" onchange="onShopChange()" class="p-2 px-3 border border-slate-300 rounded-xl font-black bg-white outline-none cursor-pointer text-xs">
+        <select id="shopSelector" onchange="onShopChange()" class="p-2 px-2.5 border border-slate-300 rounded-xl font-black bg-white outline-none cursor-pointer text-xs">
         </select>
         <span id="shopFixedBadge" class="hidden font-black text-xs text-emerald-800 bg-emerald-100 px-3 py-1.5 rounded-xl border border-emerald-300"></span>
       </div>
 
       <div class="flex items-center gap-2 flex-wrap">
         <!-- HISTORY BUTTON -->
-        <button onclick="openHistoryModal()" class="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-black rounded-xl text-[11px] shadow flex items-center gap-1 transition cursor-pointer">
+        <button onclick="openHistoryModal()" class="px-2.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-black rounded-xl text-[11px] shadow flex items-center gap-1 transition cursor-pointer">
           <i data-lucide="history" class="w-3.5 h-3.5"></i> 📜 ഹിസ്റ്ററി
         </button>
 
@@ -111,7 +111,7 @@
         </button>
 
         <label class="font-black text-slate-700">തീയതി:</label>
-        <input type="date" id="closingDate" onchange="onDateChanged()" class="p-1.5 px-2.5 border border-slate-300 rounded-xl font-black bg-white outline-none cursor-pointer text-xs" />
+        <input type="date" id="closingDate" onchange="onDateChanged()" class="p-1.5 px-2 border border-slate-300 rounded-xl font-black bg-white outline-none cursor-pointer text-xs" />
 
         <button onclick="logoutApp()" title="ലോഗൗട്ട്" class="p-2 text-slate-600 hover:bg-slate-200 rounded-xl border border-slate-300 font-bold transition flex items-center gap-1 cursor-pointer">
           <i data-lucide="log-out" class="w-4 h-4"></i>
@@ -134,45 +134,13 @@
       </div>
     </div>
 
-    <!-- 1. COUNTER CASH (പെട്ടെന്നുള്ള എൻട്രി - മുകളിൽ) -->
-    <div class="bg-emerald-50/70 p-3 sm:p-3.5 rounded-2xl border-2 border-emerald-300 print-box flex flex-wrap justify-between items-center gap-2">
-      <span class="font-black text-emerald-950 text-xs sm:text-sm">💵 കൗണ്ടറിലുള്ള ക്യാഷ് (Cash in Drawer):</span>
-      <div class="w-full sm:w-52">
-        <input 
-          type="number" 
-          step="any" 
-          id="counterCash" 
-          placeholder="0.00" 
-          onclick="this.select()"
-          onfocus="this.select()"
-          oninput="calculateTotals();" 
-          class="w-full text-right text-base sm:text-lg font-black p-2.5 px-3.5 rounded-xl border-2 border-emerald-400 bg-white outline-none focus:ring-2 focus:ring-emerald-600 text-emerald-950 font-mono shadow-sm cursor-pointer" 
-        />
-      </div>
-    </div>
-
-    <!-- 2. MADA POS MACHINES (രണ്ടാമത്) -->
-    <div class="bg-blue-50/70 p-3 sm:p-3.5 rounded-2xl border-2 border-blue-300 print-box space-y-2.5">
-      <div class="flex justify-between items-center">
-        <span class="font-black text-blue-950 text-xs sm:text-sm">💳 മദാ കാർഡ് മെഷീനുകൾ (Mada POS LDR):</span>
-        <button type="button" onclick="addMadaMachine()" class="no-print bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs px-3 py-1.5 rounded-xl shadow transition flex items-center gap-1 cursor-pointer">
-          <i data-lucide="plus-circle" class="w-3.5 h-3.5"></i> + മെഷീൻ
-        </button>
-      </div>
-
-      <div id="madaMachinesList" class="space-y-2"></div>
-
-      <div class="flex justify-between items-center pt-2 border-t border-blue-200 text-xs font-black text-blue-950">
-        <span>ആകെ മദാ ബാങ്ക് (Total Mada):</span>
-        <span id="displayTotalMada" class="text-xs sm:text-sm text-blue-900 font-mono font-black">0.00</span>
-      </div>
-    </div>
-
-    <!-- 3. EXPENSES / PURCHASES ENTRY (മൂന്നാമത് - CASH FIRST FOCUS) -->
-    <div class="bg-amber-50/70 p-3 sm:p-3.5 rounded-2xl border-2 border-amber-300 print-box space-y-2.5">
+    <!-- ========================================== -->
+    <!-- 1. EXPENSES & PURCHASES (ഏറ്റവും മുകളിൽ)      -->
+    <!-- ========================================== -->
+    <div class="bg-amber-50/70 p-3 rounded-2xl border-2 border-amber-300 print-box space-y-2.5">
       <span class="font-black text-amber-950 text-xs sm:text-sm block">⚡ പെട്ടിയിൽ നിന്നുള്ള ചിലവുകൾ / പർച്ചേസ് (Expenses & Purchases):</span>
 
-      <div class="no-print bg-white p-3 rounded-2xl border-2 border-amber-300 shadow-sm space-y-2">
+      <div class="no-print bg-white p-2.5 sm:p-3 rounded-2xl border-2 border-amber-300 shadow-sm space-y-2">
         <div class="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center relative">
           
           <!-- Unified Party Search -->
@@ -191,9 +159,9 @@
           </div>
 
           <!-- Dual Inputs: Cash First (Primary), Credit Bill (Secondary) -->
-          <div class="flex gap-2 flex-wrap sm:flex-nowrap items-center">
+          <div class="flex gap-2 items-center">
             
-            <!-- Cash Paid from Drawer (PRIMARY FOCUS) -->
+            <!-- Cash Paid from Drawer (Primary Focus) -->
             <div class="flex-1 sm:w-32">
               <input 
                 type="number" 
@@ -203,13 +171,13 @@
                 onclick="this.select()"
                 onfocus="this.select()"
                 oninput="updateLiveRemainingPreview()"
-                class="w-full p-2.5 px-2 text-xs sm:text-sm font-black border-2 border-slate-200 rounded-xl outline-none focus:border-amber-500 text-right font-mono" 
+                class="w-full p-2.5 px-2.5 text-xs sm:text-sm font-black border-2 border-slate-200 rounded-xl outline-none focus:border-amber-500 text-right font-mono" 
                 onkeydown="if(event.key === 'Enter') addExpenseRow();"
               />
             </div>
 
             <!-- Credit Purchase Bill Box (Optional / For Credit Vendors) -->
-            <div id="creditBillContainer" class="hidden flex-1 sm:w-32">
+            <div id="creditBillContainer" class="hidden flex-1 sm:w-28">
               <input 
                 type="number" 
                 step="any" 
@@ -236,22 +204,22 @@
         </div>
       </div>
 
-      <!-- Compact Expenses Table -->
+      <!-- Expenses Table -->
       <table class="w-full text-left border-collapse print-table bg-white rounded-xl overflow-hidden border border-amber-200">
         <thead>
           <tr class="bg-amber-100 text-amber-950 font-black text-[11px] border-b">
             <th class="p-2 w-8 text-center">#</th>
             <th class="p-2">ഇനം / വിവരണം</th>
-            <th class="p-2 text-right w-24">ക്രെഡിറ്റ് ബിൽ</th>
+            <th class="p-2 text-right w-20">ക്രെഡിറ്റ് ബിൽ</th>
             <th class="p-2 text-right w-24">കൊടുത്ത ക്യാഷ്</th>
-            <th class="p-2 text-right w-28">ബാക്കി കുടിശ്ശിക</th>
+            <th class="p-2 text-right w-24">ബാക്കി കുടിശ്ശിക</th>
             <th class="p-2 text-center w-8 no-print">✕</th>
           </tr>
         </thead>
         <tbody id="expensesTableBody" class="font-bold text-[11px] divide-y divide-slate-100"></tbody>
         <tfoot>
           <tr class="font-black text-[11px] bg-amber-100/70 border-t">
-            <td colspan="3" class="p-2 uppercase text-amber-950">പെട്ടിയിൽ നിന്നുള്ള ആകെ ക്യാഷ് ചിലവ് (Cash Outflow):</td>
+            <td colspan="3" class="p-2 uppercase text-amber-950">പെട്ടിയിൽ നിന്നുള്ള ആകെ ചിലവ് (Cash Outflow):</td>
             <td id="displayTotalExpenses" class="p-2 text-right text-amber-900 font-mono text-xs font-black">0.00</td>
             <td colspan="2" class="no-print"></td>
           </tr>
@@ -259,8 +227,48 @@
       </table>
     </div>
 
-    <!-- 4. MANAGER CASH TRANSACTIONS (നാലാമത് - ഇപ്പോൾ ഏറ്റവും താഴെയായി ക്രമീകരിച്ചു) -->
-    <div class="bg-purple-50/70 p-3 sm:p-3.5 rounded-2xl border-2 border-purple-300 print-box space-y-3">
+    <!-- ========================================== -->
+    <!-- 2. COUNTER CASH (രണ്ടാമത്)                   -->
+    <!-- ========================================== -->
+    <div class="bg-emerald-50/70 p-3 rounded-2xl border-2 border-emerald-300 print-box flex flex-wrap justify-between items-center gap-2">
+      <span class="font-black text-emerald-950 text-xs sm:text-sm">💵 കൗണ്ടറിലുള്ള ക്യാഷ് (Cash in Drawer):</span>
+      <div class="w-full sm:w-52">
+        <input 
+          type="number" 
+          step="any" 
+          id="counterCash" 
+          placeholder="0.00" 
+          onclick="this.select()"
+          onfocus="this.select()"
+          oninput="calculateTotals();" 
+          class="w-full text-right text-base sm:text-lg font-black p-2.5 px-3 rounded-xl border-2 border-emerald-400 bg-white outline-none focus:ring-2 focus:ring-emerald-600 text-emerald-950 font-mono shadow-sm cursor-pointer" 
+        />
+      </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- 3. MADA POS MACHINES (മൂന്നാമത്)             -->
+    <!-- ========================================== -->
+    <div class="bg-blue-50/70 p-3 rounded-2xl border-2 border-blue-300 print-box space-y-2.5">
+      <div class="flex justify-between items-center">
+        <span class="font-black text-blue-950 text-xs sm:text-sm">💳 മദാ കാർഡ് മെഷീനുകൾ (Mada POS LDR):</span>
+        <button type="button" onclick="addMadaMachine()" class="no-print bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs px-3 py-1.5 rounded-xl shadow transition flex items-center gap-1 cursor-pointer">
+          <i data-lucide="plus-circle" class="w-3.5 h-3.5"></i> + മെഷീൻ
+        </button>
+      </div>
+
+      <div id="madaMachinesList" class="space-y-2"></div>
+
+      <div class="flex justify-between items-center pt-2 border-t border-blue-200 text-xs font-black text-blue-950">
+        <span>ആകെ മദാ ബാങ്ക് (Total Mada):</span>
+        <span id="displayTotalMada" class="text-xs sm:text-sm text-blue-900 font-mono font-black">0.00</span>
+      </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- 4. MANAGER CASH (നാലാമത് - NO OVERFLOW)    -->
+    <!-- ========================================== -->
+    <div class="bg-purple-50/70 p-3 rounded-2xl border-2 border-purple-300 print-box space-y-3">
       <span class="font-black text-purple-950 text-xs sm:text-sm block">👔 മാനേജർ ക്യാഷ് ഇടപാടുകൾ (Drawer Handover / Float):</span>
 
       <!-- SECTION A: CASH GIVEN TO MANAGER (മുകളിൽ) -->
@@ -269,11 +277,16 @@
           <span class="font-black text-purple-900 text-xs">📤 മാനേജർക്ക് കൊടുത്തത് (Given to Manager):</span>
           <span id="displayTotalMgrOut" class="font-mono font-black text-xs text-purple-950">0.00</span>
         </div>
-        <div class="no-print flex gap-2">
-          <input type="text" id="mgrOutName" placeholder="മാനേജറുടെ പേര് / കുറിപ്പ്..." oninput="this.value = this.value.toUpperCase();" class="flex-1 p-2 px-3 text-xs font-bold border rounded-xl outline-none focus:border-purple-500 uppercase uppercase-input" />
-          <input type="number" step="any" id="mgrOutAmt" placeholder="തുക" class="w-28 p-2 px-3 text-xs font-black border rounded-xl outline-none text-right font-mono" onkeydown="if(event.key === 'Enter') addManagerOutRow();" />
-          <button type="button" onclick="addManagerOutRow()" class="bg-purple-700 hover:bg-purple-800 text-white font-black text-xs px-3 py-2 rounded-xl shadow cursor-pointer">+ ചേർക്കുക</button>
+        
+        <!-- Responsive Grid to Prevent Overflow -->
+        <div class="no-print grid grid-cols-12 gap-1.5 items-center">
+          <input type="text" id="mgrOutName" placeholder="പേര് / കുറിപ്പ്..." oninput="this.value = this.value.toUpperCase();" class="col-span-6 p-2 px-2.5 text-xs font-bold border rounded-xl outline-none focus:border-purple-500 uppercase uppercase-input min-w-0" />
+          <input type="number" step="any" id="mgrOutAmt" placeholder="തുക" class="col-span-4 p-2 px-2 text-xs font-black border rounded-xl outline-none text-right font-mono min-w-0" onkeydown="if(event.key === 'Enter') addManagerOutRow();" />
+          <button type="button" onclick="addManagerOutRow()" title="ചേർക്കുക" class="col-span-2 bg-purple-700 hover:bg-purple-800 text-white font-black text-xs py-2 rounded-xl shadow cursor-pointer flex items-center justify-center">
+            <i data-lucide="plus" class="w-4 h-4"></i>
+          </button>
         </div>
+        
         <div id="mgrOutList" class="space-y-1"></div>
       </div>
 
@@ -283,16 +296,23 @@
           <span class="font-black text-purple-900 text-xs">📥 മാനേജർ തന്നത് (Received from Manager):</span>
           <span id="displayTotalMgrIn" class="font-mono font-black text-xs text-purple-950">0.00</span>
         </div>
-        <div class="no-print flex gap-2">
-          <input type="text" id="mgrInName" placeholder="മാനേജറുടെ പേര് / കുറിപ്പ്..." oninput="this.value = this.value.toUpperCase();" class="flex-1 p-2 px-3 text-xs font-bold border rounded-xl outline-none focus:border-purple-500 uppercase uppercase-input" />
-          <input type="number" step="any" id="mgrInAmt" placeholder="തുക" class="w-28 p-2 px-3 text-xs font-black border rounded-xl outline-none text-right font-mono" onkeydown="if(event.key === 'Enter') addManagerInRow();" />
-          <button type="button" onclick="addManagerInRow()" class="bg-purple-700 hover:bg-purple-800 text-white font-black text-xs px-3 py-2 rounded-xl shadow cursor-pointer">+ ചേർക്കുക</button>
+        
+        <!-- Responsive Grid to Prevent Overflow -->
+        <div class="no-print grid grid-cols-12 gap-1.5 items-center">
+          <input type="text" id="mgrInName" placeholder="പേര് / കുറിപ്പ്..." oninput="this.value = this.value.toUpperCase();" class="col-span-6 p-2 px-2.5 text-xs font-bold border rounded-xl outline-none focus:border-purple-500 uppercase uppercase-input min-w-0" />
+          <input type="number" step="any" id="mgrInAmt" placeholder="തുക" class="col-span-4 p-2 px-2 text-xs font-black border rounded-xl outline-none text-right font-mono min-w-0" onkeydown="if(event.key === 'Enter') addManagerInRow();" />
+          <button type="button" onclick="addManagerInRow()" title="ചേർക്കുക" class="col-span-2 bg-purple-700 hover:bg-purple-800 text-white font-black text-xs py-2 rounded-xl shadow cursor-pointer flex items-center justify-center">
+            <i data-lucide="plus" class="w-4 h-4"></i>
+          </button>
         </div>
+        
         <div id="mgrInList" class="space-y-1"></div>
       </div>
     </div>
 
-    <!-- 5. FINAL SUMMARY -->
+    <!-- ========================================== -->
+    <!-- 5. FINAL SUMMARY                          -->
+    <!-- ========================================== -->
     <div class="bg-slate-900 text-white p-3.5 sm:p-4 rounded-2xl space-y-2 print-box border border-slate-950 shadow-md">
       <div class="flex justify-between items-center text-emerald-400 border-b border-slate-800 pb-1.5 text-xs sm:text-sm">
         <span class="font-bold">1. ടോട്ടൽ ക്യാഷ് സെയിൽ (Cash + Expenses + Mgr):</span>
@@ -574,20 +594,22 @@
         const expenses = expRes.data || [];
         const transactions = txRes.data || [];
 
-        // 1. Vendors
+        // 1. Vendors (Strict Cash vs Credit)
         vendors.forEach(v => {
           const vName = (v.name || '').trim().toUpperCase();
           const vType = (v.type || 'credit').toLowerCase();
           let due = parseFloat(v.opening_balance) || 0;
 
-          transactions.forEach(t => {
-            if (t && t.type === 'purchase' && (t.party_name || '').trim().toUpperCase() === vName) {
-              const cr = parseFloat(t.credit_amount) || 0;
-              const ca = Math.abs(parseFloat(t.cash_amount) || 0);
-              const ba = Math.abs(parseFloat(t.bank_amount) || 0);
-              due += (cr - ca - ba);
-            }
-          });
+          if (vType === 'credit') {
+            transactions.forEach(t => {
+              if (t && t.type === 'purchase' && (t.party_name || '').trim().toUpperCase() === vName) {
+                const cr = parseFloat(t.credit_amount) || 0;
+                const ca = Math.abs(parseFloat(t.cash_amount) || 0);
+                const ba = Math.abs(parseFloat(t.bank_amount) || 0);
+                due += (cr - ca - ba);
+              }
+            });
+          }
 
           masterPartyCache.push({
             name: vName,
@@ -633,7 +655,7 @@
           });
         });
 
-        // 3. Fixed / Utility Expenses Master
+        // 3. Fixed / Monthly Payable Expenses Master
         expenses.forEach(ex => {
           const exName = (ex.name || '').trim().toUpperCase();
           let due = parseFloat(ex.opening_balance) || 0;
@@ -646,7 +668,7 @@
           });
           masterPartyCache.push({
             name: exName,
-            type: 'expense',
+            type: 'expense_fixed',
             label: `[EXPENSE] ${exName}`,
             due: Math.max(0, due)
           });
@@ -658,7 +680,7 @@
     }
 
     // ==========================================
-    // MANAGER TRANSACTIONS (STACKED MULTIPLE ENTRIES)
+    // MANAGER TRANSACTIONS
     // ==========================================
     function addManagerOutRow() {
       const nameInp = document.getElementById("mgrOutName");
@@ -741,7 +763,7 @@
     }
 
     // ==========================================
-    // EXPENSE / PURCHASE DROPDOWN (ONLY 2 NEW OPTIONS)
+    // EXPENSE / PURCHASE DROPDOWN
     // ==========================================
     function showPartyDropdown() {
       filterPartyDropdown(document.getElementById("expPartyInput").value);
@@ -757,16 +779,25 @@
       filtered.slice(0, 15).forEach(p => {
         const item = document.createElement("div");
         item.className = "p-2.5 px-3 hover:bg-slate-100 cursor-pointer flex justify-between items-center text-xs font-bold";
+        
+        let dueDisplay = '';
+        if (p.vendorType === 'credit' || p.type === 'employee' || (p.type === 'expense_fixed' && p.due > 0)) {
+          dueDisplay = `<span class="text-[11px] font-mono ${p.due < 0 ? 'text-amber-700' : 'text-rose-700'} font-black">
+            ${p.due < 0 ? 'അഡ്വാൻസ്: ' + Math.abs(p.due).toLocaleString('en-IN', { minimumFractionDigits: 2 }) : 'ബാക്കി: ' + p.due.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+          </span>`;
+        } else {
+          dueDisplay = `<span class="text-[11px] font-mono text-slate-400 font-bold">-</span>`;
+        }
+
         item.innerHTML = `
           <span class="text-slate-900">${p.label}</span>
-          <span class="text-[11px] font-mono ${p.due < 0 ? 'text-amber-700' : 'text-rose-700'} font-black">
-            ${p.due < 0 ? 'അഡ്വാൻസ്: ' + Math.abs(p.due).toLocaleString('en-IN', { minimumFractionDigits: 2 }) : 'ബാക്കി: ' + p.due.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-          </span>
+          ${dueDisplay}
         `;
         item.onmousedown = () => selectParty(p);
         popup.appendChild(item);
       });
 
+      // Options for New Names
       if (q.length > 0) {
         const hasExactMatch = masterPartyCache.some(p => p.name === q);
         if (!hasExactMatch) {
@@ -783,7 +814,7 @@
           addExpOption.className = "p-2.5 px-3 bg-amber-50 hover:bg-amber-100 text-amber-950 font-black cursor-pointer flex justify-between items-center text-xs border-t border-amber-200";
           addExpOption.innerHTML = `
             <span>⚡ "${q}" - [EXPENSE] ചിലവായി ചേർക്കുക</span>
-            <span class="text-[10px] bg-amber-200 text-amber-900 px-2 py-0.5 rounded">ചിലവ് മാസ്റ്റർ</span>
+            <span class="text-[10px] bg-amber-200 text-amber-900 px-2 py-0.5 rounded">നിത്യചിലവ്</span>
           `;
           addExpOption.onmousedown = () => selectParty({ name: q, type: 'regular_expense', label: `[EXPENSE] ${q}`, due: 0, isNewExpense: true });
           popup.appendChild(addExpOption);
@@ -812,7 +843,7 @@
         creditContainer.classList.remove("hidden");
         amtInput.placeholder = "💵 കൊടുത്ത ക്യാഷ്";
         creditBillInput.value = "";
-        setTimeout(() => amtInput.focus(), 50); // CASH FIRST!
+        setTimeout(() => amtInput.focus(), 50);
       } else {
         creditContainer.classList.add("hidden");
         creditBillInput.value = "";
@@ -820,18 +851,26 @@
         setTimeout(() => amtInput.focus(), 50);
       }
 
-      const badge = document.getElementById("liveBalanceBadge");
-      badge.classList.remove("hidden");
-      document.getElementById("lblCurrentDue").innerText = (party.due || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 });
       updateLiveRemainingPreview();
     }
 
     function updateLiveRemainingPreview() {
+      const badge = document.getElementById("liveBalanceBadge");
       if (!selectedPartyObject) {
-        document.getElementById("liveBalanceBadge").classList.add("hidden");
+        badge.classList.add("hidden");
         return;
       }
-      const badge = document.getElementById("liveBalanceBadge");
+
+      // ONLY SHOW LIVE DUE FOR CREDIT VENDORS, EMPLOYEES & FIXED EXPENSES WITH DUE
+      const hasActualBalance = (selectedPartyObject.vendorType === 'credit') || 
+                               (selectedPartyObject.type === 'employee') || 
+                               (selectedPartyObject.type === 'expense_fixed' && selectedPartyObject.due > 0);
+
+      if (!hasActualBalance) {
+        badge.classList.add("hidden");
+        return;
+      }
+
       badge.classList.remove("hidden");
       document.getElementById("lblCurrentDue").innerText = (selectedPartyObject.due || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 });
 
@@ -902,7 +941,7 @@
       calculateTotals();
     }
 
-    // EXPENSES TABLE
+    // EXPENSES TABLE (STRICTLY NO MINUS ON CASH VENDORS / PETTY EXPENSES)
     function renderExpensesTable() {
       const tbody = document.getElementById("expensesTableBody");
       tbody.innerHTML = "";
@@ -913,12 +952,18 @@
       closingState.expenses.forEach((item, idx) => {
         const tr = document.createElement("tr");
         const creditBillDisp = item.credit_bill > 0 ? item.credit_bill.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '-';
+        
+        // STRICT CHECK: IF NULL, DISPLAY DASH (-) NEVER A NEGATIVE NUMBER!
+        const remDisp = (item.remaining_due !== null && item.remaining_due !== undefined) 
+          ? item.remaining_due.toLocaleString('en-IN', { minimumFractionDigits: 2 }) 
+          : '-';
+
         tr.innerHTML = `
           <td class="p-2 text-center text-slate-500">${idx + 1}</td>
           <td class="p-2 font-black text-slate-900">${item.desc}</td>
           <td class="p-2 text-right font-mono text-blue-900 font-bold">${creditBillDisp}</td>
           <td class="p-2 text-right font-black text-amber-950 font-mono">${item.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
-          <td class="p-2 text-right font-mono text-slate-600 font-bold">${item.remaining_due !== undefined ? item.remaining_due.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '-'}</td>
+          <td class="p-2 text-right font-mono text-slate-600 font-bold">${remDisp}</td>
           <td class="p-2 text-center no-print"><button onclick="removeExpenseRow(${idx})" title="ഈ വരി ഒഴിവാക്കുക" class="text-rose-500 hover:text-rose-700 font-black cursor-pointer p-1">✕</button></td>
         `;
         tbody.appendChild(tr);
@@ -938,16 +983,25 @@
       if (cashPaid <= 0 && creditBill <= 0) return alert("തുക നൽകുക!");
 
       const type = selectedPartyObject ? selectedPartyObject.type : 'regular_expense';
-      const vendorType = selectedPartyObject ? (selectedPartyObject.vendorType || 'credit') : 'credit';
+      const vendorType = selectedPartyObject ? (selectedPartyObject.vendorType || 'cash') : 'cash';
       const due = selectedPartyObject ? (selectedPartyObject.due || 0) : 0;
       const isNewV = selectedPartyObject ? !!selectedPartyObject.isNewVendor : false;
       const isNewE = selectedPartyObject ? !!selectedPartyObject.isNewExpense : false;
 
-      let rem = due;
-      if (type === 'vendor' && vendorType === 'credit') {
-        rem = rem + creditBill - cashPaid;
+      // STRICT LOGIC: ONLY CREDIT VENDORS / STAFF / FIXED EXPENSES HAVE REMAINING DUE!
+      let rem = null;
+      if (type === 'vendor') {
+        if (vendorType === 'credit') {
+          rem = due + creditBill - cashPaid;
+        } else {
+          rem = null; // Cash vendor has no due!
+        }
+      } else if (type === 'employee') {
+        rem = due - cashPaid;
+      } else if (type === 'expense_fixed' && due > 0) {
+        rem = due - cashPaid;
       } else {
-        rem = rem - cashPaid;
+        rem = null; // Petty/regular expense has no due!
       }
 
       closingState.expenses.push({
@@ -1283,19 +1337,20 @@
               <span>ക്ലോസിംഗ് തീയതി:</span>
               <span class="font-mono">${data.date}</span>
             </div>
-            <div class="flex justify-between">
-              <span>💵 കൗണ്ടർ ക്യാഷ്:</span>
+            
+            <div class="bg-amber-50 p-2 rounded-xl">
+              <span class="font-bold text-amber-900 block mb-1">⚡ ചിലവുകൾ & പർച്ചേസ് (${parseFloat(data.total_cash_sale - (data.counter_cash||0) - (data.manager_cash_out||0) + (data.manager_cash_in||0)).toLocaleString('en-IN', {minimumFractionDigits: 2})}):</span>
+              ${expHtml || '<p class="text-slate-400">ചിലവുകൾ ഇല്ല</p>'}
+            </div>
+
+            <div class="flex justify-between p-2 bg-emerald-50 rounded-xl">
+              <span class="font-bold text-emerald-950">💵 കൗണ്ടർ ക്യാഷ്:</span>
               <span class="font-mono font-bold">${parseFloat(data.counter_cash||0).toLocaleString('en-IN', {minimumFractionDigits: 2})}</span>
             </div>
 
             <div class="bg-blue-50 p-2 rounded-xl">
               <span class="font-bold text-blue-900 block mb-1">💳 മദാ ബാങ്ക് (${parseFloat(data.total_bank_sale||0).toLocaleString('en-IN', {minimumFractionDigits: 2})}):</span>
               ${madaHtml || '<p class="text-slate-400">ഇല്ല</p>'}
-            </div>
-
-            <div class="bg-amber-50 p-2 rounded-xl">
-              <span class="font-bold text-amber-900 block mb-1">⚡ ചിലവുകൾ & പർച്ചേസ്:</span>
-              ${expHtml || '<p class="text-slate-400">ചിലവുകൾ ഇല്ല</p>'}
             </div>
             
             ${mgrOutList.length > 0 ? `
@@ -1361,7 +1416,9 @@
       let expText = "";
       closingState.expenses.forEach(e => {
         totalExpenses += e.amount;
-        let remStr = e.remaining_due !== undefined ? ` (ബാക്കി: ${e.remaining_due.toLocaleString('en-IN', { minimumFractionDigits: 2 })})` : '';
+        let remStr = (e.remaining_due !== null && e.remaining_due !== undefined) 
+          ? ` (ബാക്കി: ${e.remaining_due.toLocaleString('en-IN', { minimumFractionDigits: 2 })})` 
+          : '';
         let crBillStr = e.credit_bill > 0 ? ` [ബിൽ: ${e.credit_bill.toLocaleString('en-IN', { minimumFractionDigits: 2 })}]` : '';
         expText += `  ▫️ ${e.desc}${crBillStr}: ${e.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}${remStr}\n`;
       });
@@ -1372,9 +1429,9 @@
       let text = `📊 *${shopName} - DAILY CASH CLOSING*\n` +
                  `📅 *Date:* ${dt}\n` +
                  `--------------------------------\n` +
-                 `💵 *Counter Cash:* ${counterCash.toLocaleString('en-IN', { minimumFractionDigits: 2 })}\n` +
                  `⚡ *Expenses Outflow:* ${totalExpenses.toLocaleString('en-IN', { minimumFractionDigits: 2 })}\n` +
                  (expText ? `${expText}` : '') +
+                 `💵 *Counter Cash:* ${counterCash.toLocaleString('en-IN', { minimumFractionDigits: 2 })}\n` +
                  (mgrOutText ? `📤 *Cash to Manager (${managerOut}):*\n${mgrOutText}` : '') +
                  (mgrInText ? `📥 *Cash from Manager (${managerIn}):*\n${mgrInText}` : '') +
                  `💰 *Total Cash Sale:* ${totalCashSale.toLocaleString('en-IN', { minimumFractionDigits: 2 })}\n` +
